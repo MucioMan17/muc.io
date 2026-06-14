@@ -6,6 +6,7 @@ const lookupRouter = require('./routes/lookup');
 const { router: casesRouter } = require('./routes/cases');
 const reportsRouter = require('./routes/reports');
 const searchRouter = require('./routes/search');
+const osintRouter = require('./routes/osint');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -18,6 +19,7 @@ app.use('/api/lookup', lookupRouter);
 app.use('/api/cases', casesRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/search', searchRouter);
+app.use('/api/osint', osintRouter);
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));

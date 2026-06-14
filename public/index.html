@@ -18,6 +18,7 @@
     <div class="nav-links">
       <button class="nav-btn active" data-view="cases">Cases</button>
       <button class="nav-btn" data-view="lookup">Username Lookup</button>
+      <button class="nav-btn" data-view="osint">Email / Phone</button>
       <button class="nav-btn" data-view="evidence">Log Evidence</button>
     </div>
   </nav>
@@ -66,6 +67,39 @@
       </div>
       <div id="lookup-spinner" class="spinner hidden">Searching platforms<span class="dots"></span></div>
       <div id="lookup-results"></div>
+    </section>
+
+    <!-- EMAIL / PHONE OSINT VIEW -->
+    <section id="view-osint" class="view hidden">
+      <div class="section-header"><h2>Email &amp; Phone Lookup</h2></div>
+
+      <div class="osint-grid">
+        <div class="card">
+          <h3>Email Address</h3>
+          <p class="hint">Generates direct links to breach databases, caller-ID tools, and OSINT search engines for this email. Each link opens in a new tab so you check it yourself.</p>
+          <label>Email address <input type="email" id="osint-email" placeholder="target@example.com" /></label>
+          <label>Attach to Case (optional)
+            <select id="osint-email-case">
+              <option value="">— No case —</option>
+            </select>
+          </label>
+          <button class="btn btn-primary" id="run-email-osint">Look Up Email</button>
+          <div id="email-osint-results"></div>
+        </div>
+
+        <div class="card">
+          <h3>Phone Number</h3>
+          <p class="hint">Generates direct links to caller-ID databases and phone lookup tools for this number.</p>
+          <label>Phone number <input type="tel" id="osint-phone" placeholder="+1 555 000 0000" /></label>
+          <label>Attach to Case (optional)
+            <select id="osint-phone-case">
+              <option value="">— No case —</option>
+            </select>
+          </label>
+          <button class="btn btn-primary" id="run-phone-osint">Look Up Phone</button>
+          <div id="phone-osint-results"></div>
+        </div>
+      </div>
     </section>
 
     <!-- EVIDENCE VIEW -->

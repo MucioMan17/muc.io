@@ -9,10 +9,10 @@ const { createZip } = require('../utils/zip');
 const router = express.Router();
 
 const REPORTING_LINKS = [
-  ['NCMEC CyberTipline (REQUIRED for child exploitation / grooming / CSAM)', 'https://report.cybertip.org   |   1-800-843-5678'],
-  ['FBI — online predators / child exploitation', 'https://tips.fbi.gov   |   https://www.ic3.gov'],
-  ['ICAC Task Force (find your regional unit)', 'https://www.icactaskforce.org'],
-  ['Local police / sheriff (911 if a child is in immediate danger)', ''],
+  ['NCMEC CyberTipline (for child exploitation / CSAM)', 'https://report.cybertip.org   |   1-800-843-5678'],
+  ['FBI — tips.fbi.gov or IC3', 'https://tips.fbi.gov   |   https://www.ic3.gov'],
+  ['ICAC Task Force', 'https://www.icactaskforce.org'],
+  ['Local law enforcement', ''],
 ];
 
 const fmtBytes = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
@@ -302,5 +302,63 @@ function wrap(text, width = 72) {
   });
   return out;
 }
+
+// GET /api/reports/:case_id/briefing — a clean team briefing (not a formal LE
+// report). Markdown-style plain text, easy to paste into a group chat or doc.
+router.get('/:case_id/briefing', (req, res) => {
+  const full = loadFullCase(req.params.case_id);
+  if (!full) return res.status(404).json({ error: 'Case not found' });
+
+  const { case_, suspects, evidence, lookups } = full;
+  const lines = [];
+  const line = (s = '') => lines.push(s);
+
+  line(`# Investigation Briefing — ${case_.alias}`);
+  line(`Generated: ${new Date().toISOString()}`);
+  if (case_.lead_investigator) line(`Researcher: ${case_.lead_investigator}`);
+  line();
+
+  if (suspects.length) {
+    line('## Suspect Profiles');
+    suspects.forEach((s) => {
+      line(`**${s.display_name}**`);
+      if (s.known_usernames.length) line(`- Usernames: ${s.known_usernames.map((u) => '@' + u).join(', ')}`);
+      if (s.known_emails.length)    line(`- Emails: ${s.known_emails.join(', ')}`);
+      if (s.known_phones.length)    line(`- Phone numbers: ${s.known_phones.join(', ')}`);
+      if (s.platform_profiles.length) { line('- Confirmed profiles:'); s.platform_profiles.forEach((p) => line(`  - ${p}`)); }
+      if (s.notes) line(`- Notes: ${s.notes}`);
+      line();
+    });
+  }
+
+  if (lookups.length) {
+    line('## Platform Lookups');
+    lookups.forEach((l) => {
+      const found = l.results.filter((r) => r.status === 'FOUND');
+      const manual = l.results.filter((r) => r.status === 'MANUAL CHECK');
+      line(`**@${l.username}** (searched ${l.searched_at})`);
+      if (found.length) { line('Verified active:'); found.forEach((r) => line(`  ✓ ${r.platform}: ${r.url}`)); }
+      if (manual.length) { line('Check manually:'); manual.forEach((r) => line(`  ? ${r.platform}: ${r.url}`)); }
+      const absent = l.results.filter((r) => r.status === 'NOT FOUND').map((r) => r.platform);
+      if (absent.length) line(`Not found on: ${absent.join(', ')}`);
+      line();
+    });
+  }
+
+  if (evidence.length) {
+    line('## Evidence Notes');
+    [...evidence].reverse().forEach((e, i) => {
+      line(`### ${i + 1}. ${e.type}${e.platform ? ' · ' + e.platform : ''} — ${e.timestamp}`);
+      line(e.content);
+      if (e.attachments && e.attachments.length) line(`_${e.attachments.length} attachment(s) — see full bundle_`);
+      if (e.notes) line(`_Note: ${e.notes}_`);
+      line();
+    });
+  }
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${slug(case_.alias)}-briefing.txt"`);
+  res.send(lines.join('\n'));
+});
 
 module.exports = router;

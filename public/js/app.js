@@ -18,7 +18,7 @@ function showView(name) {
   const el = document.getElementById(`view-${name}`);
   if (el) el.classList.add('active');
   if (name === 'cases') loadCases();
-  if (name === 'lookup' || name === 'evidence') loadCaseDropdowns();
+  if (name === 'lookup' || name === 'evidence' || name === 'osint') loadCaseDropdowns();
 }
 
 // ---- Cases ----
@@ -85,9 +85,9 @@ async function openCase(id) {
         </div>
       </div>
       <div class="btn-row report-actions">
-        <button class="btn btn-success report-btn" onclick="downloadReport('${id}','text')">&#128196; Text Report</button>
-        <button class="btn btn-ghost report-btn" onclick="openReport('${id}')">&#128462; Printable (PDF)</button>
-        <button class="btn btn-primary report-btn" onclick="downloadBundle('${id}')">&#128230; Evidence Bundle (.zip)</button>
+        <button class="btn btn-primary report-btn" onclick="downloadBriefing('${id}')">&#128203; Team Briefing</button>
+        <button class="btn btn-ghost report-btn" onclick="downloadBundle('${id}')">&#128230; Full Bundle (.zip)</button>
+        <button class="btn btn-ghost report-btn" onclick="openReport('${id}')">&#128462; Formal PDF</button>
         <button class="btn btn-danger report-btn" onclick="deleteCase('${id}', '${esc(data.alias).replace(/'/g, "\\'")}')">Delete</button>
       </div>
     </div>
@@ -167,6 +167,7 @@ function renderSuspects(suspects, caseId) {
       <div class="suspect-head">
         <h4>${esc(s.display_name)}</h4>
         <div class="suspect-actions">
+          <button class="icon-btn" title="Copy summary to clipboard" onclick='copySuspect(${JSON.stringify(s).replace(/'/g, "&#39;")})'>&#128203;</button>
           <button class="icon-btn" title="Edit" onclick='editSuspect(${JSON.stringify(s).replace(/'/g, "&#39;")}, "${caseId}")'>&#9998;</button>
           <button class="icon-btn danger" title="Delete" onclick="deleteSuspect('${caseId}','${s.id}','${esc(s.display_name).replace(/'/g, "\\'")}')">&#128465;</button>
         </div>
@@ -400,8 +401,8 @@ async function deleteCase(caseId, alias) {
   document.getElementById('view-case-detail').classList.add('hidden');
 }
 
-async function downloadReport(caseId) {
-  window.location.href = `/api/reports/${caseId}?format=text`;
+function downloadBriefing(caseId) {
+  window.location.href = `/api/reports/${caseId}/briefing`;
 }
 
 function openReport(caseId) {
@@ -410,6 +411,31 @@ function openReport(caseId) {
 
 function downloadBundle(caseId) {
   window.location.href = `/api/reports/${caseId}/bundle`;
+}
+
+function copySuspect(s) {
+  const lines = [`Name: ${s.display_name}`];
+  if (s.known_usernames.length) lines.push(`Usernames: ${s.known_usernames.map((u) => '@' + u).join(', ')}`);
+  if (s.known_emails.length)    lines.push(`Emails: ${s.known_emails.join(', ')}`);
+  if (s.known_phones.length)    lines.push(`Phones: ${s.known_phones.join(', ')}`);
+  if (s.platform_profiles.length) lines.push(`Profiles:\n  ${s.platform_profiles.join('\n  ')}`);
+  if (s.notes)                  lines.push(`Notes: ${s.notes}`);
+  navigator.clipboard.writeText(lines.join('\n'))
+    .then(() => showToast('Suspect summary copied to clipboard'))
+    .catch(() => showToast('Copy failed — try selecting manually'));
+}
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.className = 'toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add('visible');
+  setTimeout(() => t.classList.remove('visible'), 2500);
 }
 
 document.getElementById('back-to-cases').addEventListener('click', () => {
@@ -531,7 +557,7 @@ document.getElementById('submit-evidence').addEventListener('click', async () =>
 // ---- Helpers ----
 async function loadCaseDropdowns() {
   const cases = await api('/api/cases');
-  ['lookup-case-id', 'evidence-case-id'].forEach((selId) => {
+  ['lookup-case-id', 'evidence-case-id', 'osint-email-case', 'osint-phone-case'].forEach((selId) => {
     const sel = document.getElementById(selId);
     const first = sel.options[0];
     sel.innerHTML = '';
@@ -572,6 +598,42 @@ function fmtType(t) {
 function fmtBytes(n) {
   n = Number(n) || 0;
   return n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`;
+}
+
+// ---- Email / Phone OSINT ----
+document.getElementById('run-email-osint').addEventListener('click', async () => {
+  const email = document.getElementById('osint-email').value.trim();
+  if (!email) return alert('Enter an email address.');
+  const case_id = document.getElementById('osint-email-case').value;
+  const data = await api('/api/osint/email', 'POST', { email, case_id: case_id || undefined });
+  document.getElementById('email-osint-results').innerHTML = renderOsintLinks(data.links, data.email, 'email');
+});
+
+document.getElementById('run-phone-osint').addEventListener('click', async () => {
+  const phone = document.getElementById('osint-phone').value.trim();
+  if (!phone) return alert('Enter a phone number.');
+  const case_id = document.getElementById('osint-phone-case').value;
+  const data = await api('/api/osint/phone', 'POST', { phone, case_id: case_id || undefined });
+  document.getElementById('phone-osint-results').innerHTML = renderOsintLinks(data.links, data.phone, 'phone');
+});
+
+function renderOsintLinks(links, query, type) {
+  return `
+    <div style="margin-top:1rem">
+      <div style="margin-bottom:0.75rem;font-size:0.85rem;color:var(--text-muted)">
+        Open each link and check manually — results are not auto-scraped.
+      </div>
+      <div class="osint-link-list">
+        ${links.map((l) => `
+          <div class="osint-link-item">
+            <div class="oli-name">${esc(l.name)}</div>
+            <div class="oli-desc">${esc(l.description)}</div>
+            ${l.url
+              ? `<a class="oli-link" href="${esc(l.url)}" target="_blank" rel="noreferrer noopener">Open ↗</a>`
+              : `<span class="oli-link muted">run locally</span>`}
+          </div>`).join('')}
+      </div>
+    </div>`;
 }
 
 // ---- Global search ----
