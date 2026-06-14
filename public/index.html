@@ -30,6 +30,7 @@
       <div id="new-case-form" class="card hidden">
         <h3>Create New Case</h3>
         <label>Case Alias / Codename <input type="text" id="case-alias" placeholder="e.g. Operation Nightfall" /></label>
+        <label>Lead Investigator <input type="text" id="case-lead" placeholder="Your name / handle (for the report)" /></label>
         <label>Initial Notes <textarea id="case-notes" rows="3" placeholder="Optional background info..."></textarea></label>
         <div class="btn-row">
           <button class="btn btn-primary" id="submit-case">Create Case</button>
@@ -50,7 +51,7 @@
     <section id="view-lookup" class="view hidden">
       <div class="section-header"><h2>Username Lookup</h2></div>
       <div class="card">
-        <p class="hint">Searches the username across 15+ platforms using public profile URLs. Results saved to the selected case.</p>
+        <p class="hint">Verifies the username against platforms with public APIs (GitHub, Reddit, Steam, Roblox, Telegram, Keybase, GitLab, Tumblr) and builds candidate links for login-walled sites that need manual confirmation. <strong>"Manual check" links are leads, not confirmed matches</strong> — verify by eye before attributing. Results save to the selected case.</p>
         <label>Username (without @) <input type="text" id="lookup-username" placeholder="e.g. johndoe123" /></label>
         <label>Attach to Case (optional)
           <select id="lookup-case-id">
@@ -92,6 +93,7 @@
         <label>Content / Description
           <textarea id="evidence-content" rows="6" placeholder="Paste chat log, describe screenshot, or enter any relevant text..."></textarea>
         </label>
+        <label>Collected By (investigator) <input type="text" id="evidence-investigator" placeholder="Your name / handle" /></label>
         <label>Notes <input type="text" id="evidence-notes" placeholder="Optional notes about this evidence..." /></label>
         <button class="btn btn-primary" id="submit-evidence">Log Evidence</button>
         <div id="evidence-feedback" class="feedback hidden"></div>

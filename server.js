@@ -3,7 +3,7 @@ const path = require('path');
 const { initDb } = require('./utils/db');
 
 const lookupRouter = require('./routes/lookup');
-const casesRouter = require('./routes/cases');
+const { router: casesRouter } = require('./routes/cases');
 const reportsRouter = require('./routes/reports');
 
 const app = express();

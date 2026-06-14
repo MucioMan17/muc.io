@@ -55,10 +55,12 @@ document.getElementById('cancel-case').addEventListener('click', () => {
 document.getElementById('submit-case').addEventListener('click', async () => {
   const alias = document.getElementById('case-alias').value.trim();
   const notes = document.getElementById('case-notes').value.trim();
+  const lead_investigator = document.getElementById('case-lead').value.trim();
   if (!alias) return alert('Please enter a case alias.');
-  await api('/api/cases', 'POST', { alias, notes });
+  await api('/api/cases', 'POST', { alias, notes, lead_investigator });
   document.getElementById('new-case-form').classList.add('hidden');
   document.getElementById('case-alias').value = '';
+  document.getElementById('case-lead').value = '';
   document.getElementById('case-notes').value = '';
   loadCases();
 });
@@ -84,6 +86,7 @@ async function openCase(id) {
       </div>
       <div class="btn-row">
         <button class="btn btn-success report-btn" onclick="downloadReport('${id}')">&#128196; Export LE Report</button>
+        <button class="btn btn-danger report-btn" onclick="deleteCase('${id}', '${esc(data.alias).replace(/'/g, "\\'")}')">Delete</button>
       </div>
     </div>
 
@@ -116,11 +119,14 @@ async function openCase(id) {
 
     <div id="tab-notes" class="tab-content">
       <div class="card">
+        <label>Lead Investigator
+          <input type="text" id="case-lead-edit" value="${esc(data.lead_investigator || '')}" placeholder="Name / handle for the report" />
+        </label>
         <label>Case Notes
           <textarea id="case-notes-edit" rows="6">${esc(data.notes || '')}</textarea>
         </label>
         <div class="btn-row">
-          <button class="btn btn-primary" onclick="saveNotes('${id}')">Save Notes</button>
+          <button class="btn btn-primary" onclick="saveNotes('${id}')">Save</button>
           <label style="margin:0;flex-direction:row;align-items:center;gap:0.5rem">
             Status:
             <select id="case-status-edit" style="width:auto">
@@ -199,46 +205,84 @@ async function submitSuspect(caseId) {
 }
 
 function renderEvidence(e) {
+  let integrity = '';
+  if (e.integrity_ok === true) integrity = '<span class="integrity ok" title="SHA-256 hash matches — record unaltered">&#10003; verified</span>';
+  else if (e.integrity_ok === false) integrity = '<span class="integrity bad" title="Hash mismatch — record may have been altered">&#9888; tampered</span>';
   return `
     <div class="evidence-entry ${e.type}">
       <div class="ev-meta">
         <strong>${fmtType(e.type)}</strong>
         ${e.platform ? ` &bull; ${esc(e.platform)}` : ''}
         &bull; ${fmtDate(e.timestamp)}
+        ${e.investigator ? ` &bull; by ${esc(e.investigator)}` : ''}
+        ${integrity}
         ${e.notes ? ` &bull; <em>${esc(e.notes)}</em>` : ''}
       </div>
       <div class="ev-content">${esc(e.content)}</div>
+      ${e.content_hash ? `<div class="ev-hash" title="Integrity hash">SHA-256: ${esc(e.content_hash)}</div>` : ''}
     </div>
   `;
 }
 
 function renderLookup(l) {
-  const found = l.results.filter((r) => r.found);
   return `
     <div class="card" style="margin-bottom:0.75rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
         <strong>@${esc(l.username)}</strong>
         <span style="font-size:0.78rem;color:var(--text-muted)">${fmtDate(l.searched_at)}</span>
       </div>
-      <div style="margin-bottom:0.5rem;font-size:0.82rem;color:var(--success)">${found.length} platform(s) found</div>
-      <div class="lookup-result-grid">
-        ${l.results.map(renderLookupItem).join('')}
-      </div>
+      ${renderLookupSummary(l.results)}
+      ${renderLookupGroups(l.results)}
     </div>
   `;
 }
 
+const BLOCKED_STATUSES = ['CHECK BLOCKED', 'ERROR', 'TIMEOUT'];
+
+function renderLookupSummary(results) {
+  const found = results.filter((r) => r.status === 'FOUND').length;
+  const manual = results.filter((r) => r.status === 'MANUAL CHECK').length;
+  const absent = results.filter((r) => r.status === 'NOT FOUND').length;
+  const blocked = results.filter((r) => BLOCKED_STATUSES.includes(r.status)).length;
+  return `<div class="lookup-summary">
+    <span class="pill pill-found">${found} verified</span>
+    <span class="pill pill-manual">${manual} manual</span>
+    ${blocked ? `<span class="pill pill-blocked">${blocked} undetermined</span>` : ''}
+    <span class="pill pill-absent">${absent} absent</span>
+  </div>`;
+}
+
+// Order: verified hits, then manual leads, then undetermined, then absent.
+function renderLookupGroups(results) {
+  const rank = (s) =>
+    s === 'FOUND' ? 0 : s === 'MANUAL CHECK' ? 1 : s === 'NOT FOUND' ? 3 : 2;
+  const sorted = [...results].sort((a, b) => rank(a.status) - rank(b.status));
+  return `<div class="lookup-result-grid">${sorted.map(renderLookupItem).join('')}</div>`;
+}
+
 function renderLookupItem(r) {
-  const cls = r.found ? 'found' : r.status === 'ERROR' || r.status === 'TIMEOUT' ? 'error' : '';
-  const dot = r.found ? 'dot-found' : r.status !== 'NOT FOUND' ? 'dot-error' : 'dot-not-found';
+  let cls = '', dot = 'dot-not-found';
+  const blocked = BLOCKED_STATUSES.includes(r.status);
+  if (r.status === 'FOUND') { cls = 'found'; dot = 'dot-found'; }
+  else if (r.status === 'MANUAL CHECK') { cls = 'manual'; dot = 'dot-manual'; }
+  else if (blocked) { cls = 'error'; dot = 'dot-error'; }
+
+  // We can offer a link whenever we have a candidate URL (everything but a
+  // confirmed absence). For blocked auto-checks the link lets the user verify.
+  const showLink = r.status !== 'NOT FOUND' && r.url;
+  let linkText = 'Check manually';
+  if (r.status === 'FOUND') linkText = 'View profile';
+  else if (blocked) linkText = 'Re-check by hand';
+
   return `
     <div class="lookup-item ${cls}">
       <div class="lookup-dot ${dot}"></div>
-      <div>
+      <div style="min-width:0">
         <div class="platform-name">${esc(r.platform)}</div>
-        ${r.found
-          ? `<a href="${r.url}" target="_blank" rel="noreferrer noopener">${esc(r.url)}</a>`
-          : `<div class="platform-status">${r.status}</div>`}
+        ${blocked ? `<div class="platform-status">${esc(r.status)}</div>` : ''}
+        ${showLink
+          ? `<a href="${esc(r.url)}" target="_blank" rel="noreferrer noopener">${linkText}</a>`
+          : (!blocked ? `<div class="platform-status">${esc(r.status)}</div>` : '')}
       </div>
     </div>
   `;
@@ -247,8 +291,16 @@ function renderLookupItem(r) {
 async function saveNotes(caseId) {
   const notes = document.getElementById('case-notes-edit').value;
   const status = document.getElementById('case-status-edit').value;
-  await api(`/api/cases/${caseId}`, 'PATCH', { notes, status });
+  const lead_investigator = document.getElementById('case-lead-edit').value;
+  await api(`/api/cases/${caseId}`, 'PATCH', { notes, status, lead_investigator });
   alert('Saved.');
+}
+
+async function deleteCase(caseId, alias) {
+  if (!confirm(`Permanently delete case "${alias}" and all its suspects, evidence, and lookups? This cannot be undone.`)) return;
+  await api(`/api/cases/${caseId}`, 'DELETE');
+  showView('cases');
+  document.getElementById('view-case-detail').classList.add('hidden');
 }
 
 async function downloadReport(caseId) {
@@ -273,16 +325,13 @@ document.getElementById('run-lookup').addEventListener('click', async () => {
 
   document.getElementById('lookup-spinner').classList.add('hidden');
 
-  const found = data.results.filter((r) => r.found);
   document.getElementById('lookup-results').innerHTML = `
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
         <h3 style="margin:0">Results for @${esc(data.username)}</h3>
-        <span style="color:var(--success);font-weight:700">${found.length} / ${data.results.length} found</span>
       </div>
-      <div class="lookup-result-grid">
-        ${data.results.map(renderLookupItem).join('')}
-      </div>
+      ${renderLookupSummary(data.results)}
+      ${renderLookupGroups(data.results)}
     </div>
   `;
 });
@@ -317,6 +366,7 @@ document.getElementById('submit-evidence').addEventListener('click', async () =>
     platform: document.getElementById('evidence-platform').value.trim(),
     content,
     timestamp,
+    investigator: document.getElementById('evidence-investigator').value.trim(),
     notes: document.getElementById('evidence-notes').value.trim(),
   });
 
