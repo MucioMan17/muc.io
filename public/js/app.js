@@ -84,16 +84,19 @@ async function openCase(id) {
           Opened: ${fmtDate(data.created_at)} &nbsp;|&nbsp; Updated: ${fmtDate(data.updated_at)}
         </div>
       </div>
-      <div class="btn-row">
-        <button class="btn btn-success report-btn" onclick="downloadReport('${id}')">&#128196; Export LE Report</button>
+      <div class="btn-row report-actions">
+        <button class="btn btn-success report-btn" onclick="downloadReport('${id}','text')">&#128196; Text Report</button>
+        <button class="btn btn-ghost report-btn" onclick="openReport('${id}')">&#128462; Printable (PDF)</button>
+        <button class="btn btn-primary report-btn" onclick="downloadBundle('${id}')">&#128230; Evidence Bundle (.zip)</button>
         <button class="btn btn-danger report-btn" onclick="deleteCase('${id}', '${esc(data.alias).replace(/'/g, "\\'")}')">Delete</button>
       </div>
     </div>
 
     <div class="detail-tabs">
-      <button class="tab-btn active" data-tab="suspects">Suspects</button>
+      <button class="tab-btn active" data-tab="suspects">Suspects (${data.suspects.length})</button>
       <button class="tab-btn" data-tab="evidence">Evidence (${data.evidence.length})</button>
       <button class="tab-btn" data-tab="lookups">Lookups (${data.lookups.length})</button>
+      <button class="tab-btn" data-tab="timeline">Timeline</button>
       <button class="tab-btn" data-tab="notes">Notes</button>
     </div>
 
@@ -115,6 +118,10 @@ async function openCase(id) {
       ${data.lookups.length
         ? data.lookups.map(renderLookup).join('')
         : '<div class="empty-state">No username lookups for this case yet.</div>'}
+    </div>
+
+    <div id="tab-timeline" class="tab-content">
+      ${renderTimeline(data)}
     </div>
 
     <div id="tab-notes" class="tab-content">
@@ -156,8 +163,14 @@ async function openCase(id) {
 function renderSuspects(suspects, caseId) {
   if (!suspects.length) return '<div class="empty-state" style="padding:1rem 0">No suspect profiles added yet.</div>';
   return suspects.map((s) => `
-    <div class="suspect-block">
-      <h4>${esc(s.display_name)}</h4>
+    <div class="suspect-block" id="suspect-${s.id}">
+      <div class="suspect-head">
+        <h4>${esc(s.display_name)}</h4>
+        <div class="suspect-actions">
+          <button class="icon-btn" title="Edit" onclick='editSuspect(${JSON.stringify(s).replace(/'/g, "&#39;")}, "${caseId}")'>&#9998;</button>
+          <button class="icon-btn danger" title="Delete" onclick="deleteSuspect('${caseId}','${s.id}','${esc(s.display_name).replace(/'/g, "\\'")}')">&#128465;</button>
+        </div>
+      </div>
       ${s.known_usernames.length ? `<div><span style="color:var(--text-muted);font-size:0.8rem">Usernames:</span><div class="tag-list">${s.known_usernames.map((u) => `<span class="tag">@${esc(u)}</span>`).join('')}</div></div>` : ''}
       ${s.known_emails.length ? `<div style="margin-top:0.4rem"><span style="color:var(--text-muted);font-size:0.8rem">Emails:</span><div class="tag-list">${s.known_emails.map((e) => `<span class="tag">${esc(e)}</span>`).join('')}</div></div>` : ''}
       ${s.known_phones.length ? `<div style="margin-top:0.4rem"><span style="color:var(--text-muted);font-size:0.8rem">Phone #s:</span><div class="tag-list">${s.known_phones.map((p) => `<span class="tag">${esc(p)}</span>`).join('')}</div></div>` : ''}
@@ -165,6 +178,74 @@ function renderSuspects(suspects, caseId) {
       ${s.notes ? `<div style="margin-top:0.5rem;font-size:0.82rem;color:var(--text-muted)">${esc(s.notes)}</div>` : ''}
     </div>
   `).join('');
+}
+
+function editSuspect(s, caseId) {
+  const block = document.getElementById(`suspect-${s.id}`);
+  if (!block) return;
+  const j = (arr) => (arr || []).join(', ');
+  block.innerHTML = `
+    <h4>Edit Suspect</h4>
+    <label>Display Name <input type="text" id="es-name-${s.id}" value="${esc(s.display_name)}" /></label>
+    <div class="form-row">
+      <label>Usernames <input type="text" id="es-usernames-${s.id}" value="${esc(j(s.known_usernames))}" /></label>
+      <label>Emails <input type="text" id="es-emails-${s.id}" value="${esc(j(s.known_emails))}" /></label>
+    </div>
+    <div class="form-row">
+      <label>Phones <input type="text" id="es-phones-${s.id}" value="${esc(j(s.known_phones))}" /></label>
+      <label>Profile URLs <input type="text" id="es-profiles-${s.id}" value="${esc(j(s.platform_profiles))}" /></label>
+    </div>
+    <label>Notes <textarea id="es-notes-${s.id}" rows="2">${esc(s.notes || '')}</textarea></label>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveSuspect('${caseId}','${s.id}')">Save</button>
+      <button class="btn btn-ghost" onclick="openCase('${caseId}')">Cancel</button>
+    </div>`;
+}
+
+async function saveSuspect(caseId, sid) {
+  const split = (id) => document.getElementById(id).value.split(',').map((x) => x.trim()).filter(Boolean);
+  await api(`/api/cases/${caseId}/suspects/${sid}`, 'PATCH', {
+    display_name: document.getElementById(`es-name-${sid}`).value.trim(),
+    known_usernames: split(`es-usernames-${sid}`),
+    known_emails: split(`es-emails-${sid}`),
+    known_phones: split(`es-phones-${sid}`),
+    platform_profiles: split(`es-profiles-${sid}`),
+    notes: document.getElementById(`es-notes-${sid}`).value.trim(),
+  });
+  openCase(caseId);
+}
+
+async function deleteSuspect(caseId, sid, name) {
+  if (!confirm(`Delete suspect "${name}"?`)) return;
+  await api(`/api/cases/${caseId}/suspects/${sid}`, 'DELETE');
+  openCase(caseId);
+}
+
+// Merge all case activity into a single reverse-chronological timeline.
+function renderTimeline(data) {
+  const events = [];
+  events.push({ t: data.created_at, icon: '📂', text: `Case "${esc(data.alias)}" opened` });
+  data.suspects.forEach((s) => events.push({ t: null, icon: '👤', text: `Suspect on file: ${esc(s.display_name)}` }));
+  data.lookups.forEach((l) => {
+    const found = l.results.filter((r) => r.status === 'FOUND').length;
+    events.push({ t: l.searched_at, icon: '🔎', text: `Lookup @${esc(l.username)} — ${found} verified` });
+  });
+  data.evidence.forEach((e) => {
+    const att = e.attachments && e.attachments.length ? ` (+${e.attachments.length} file)` : '';
+    events.push({ t: e.timestamp, icon: '🧾', text: `${fmtType(e.type)}${e.platform ? ' · ' + esc(e.platform) : ''}${att}`, added: e.added_at });
+  });
+  const withTime = events.filter((e) => e.t).sort((a, b) => new Date(b.t) - new Date(a.t));
+  const noTime = events.filter((e) => !e.t);
+  const all = [...withTime, ...noTime];
+  if (!all.length) return '<div class="empty-state">No activity yet.</div>';
+  return `<div class="timeline">${all.map((e) => `
+    <div class="tl-item">
+      <div class="tl-icon">${e.icon}</div>
+      <div class="tl-body">
+        <div class="tl-text">${e.text}</div>
+        <div class="tl-time">${e.t ? fmtDate(e.t) : 'time not recorded'}${e.added ? ` · logged ${fmtDate(e.added)}` : ''}</div>
+      </div>
+    </div>`).join('')}</div>`;
 }
 
 function suspectFormHtml(caseId) {
@@ -219,9 +300,25 @@ function renderEvidence(e) {
         ${e.notes ? ` &bull; <em>${esc(e.notes)}</em>` : ''}
       </div>
       <div class="ev-content">${esc(e.content)}</div>
+      ${renderAttachments(e)}
       ${e.content_hash ? `<div class="ev-hash" title="Integrity hash">SHA-256: ${esc(e.content_hash)}</div>` : ''}
     </div>
   `;
+}
+
+function renderAttachments(e) {
+  if (!e.attachments || !e.attachments.length) return '';
+  const items = e.attachments.map((a) => {
+    const url = `/api/cases/${currentCaseId}/attachments/${a.id}`;
+    const isImg = /^image\//.test(a.mime || '');
+    return `<div class="att-thumb">
+      ${isImg
+        ? `<a href="${url}" target="_blank" rel="noopener"><img src="${url}" alt="${esc(a.filename)}" loading="lazy"></a>`
+        : `<a class="att-file" href="${url}" target="_blank" rel="noopener">📎 ${esc(a.filename)}</a>`}
+      <div class="att-cap" title="SHA-256: ${esc(a.sha256)}">${esc(a.filename)} · ${fmtBytes(a.size)}</div>
+    </div>`;
+  }).join('');
+  return `<div class="att-grid">${items}</div>`;
 }
 
 function renderLookup(l) {
@@ -304,7 +401,15 @@ async function deleteCase(caseId, alias) {
 }
 
 async function downloadReport(caseId) {
-  window.location.href = `/api/reports/${caseId}`;
+  window.location.href = `/api/reports/${caseId}?format=text`;
+}
+
+function openReport(caseId) {
+  window.open(`/api/reports/${caseId}?format=html`, '_blank');
+}
+
+function downloadBundle(caseId) {
+  window.location.href = `/api/reports/${caseId}/bundle`;
 }
 
 document.getElementById('back-to-cases').addEventListener('click', () => {
@@ -351,6 +456,27 @@ document.getElementById('evidence-case-id').addEventListener('change', async fun
   });
 });
 
+// Show selected file names as they're chosen.
+document.getElementById('evidence-files').addEventListener('change', function () {
+  const list = document.getElementById('evidence-file-list');
+  const files = Array.from(this.files || []);
+  list.innerHTML = files.length
+    ? files.map((f) => `<span class="file-chip">📎 ${esc(f.name)} (${fmtBytes(f.size)})</span>`).join('')
+    : '';
+});
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const res = String(reader.result);
+      resolve({ filename: file.name, mime: file.type || 'application/octet-stream', data_base64: res.split(',')[1] || '' });
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 document.getElementById('submit-evidence').addEventListener('click', async () => {
   const case_id = document.getElementById('evidence-case-id').value;
   if (!case_id) return alert('Select a case first.');
@@ -360,23 +486,46 @@ document.getElementById('submit-evidence').addEventListener('click', async () =>
   const tsRaw = document.getElementById('evidence-timestamp').value;
   const timestamp = tsRaw ? new Date(tsRaw).toISOString() : new Date().toISOString();
 
-  await api(`/api/cases/${case_id}/evidence`, 'POST', {
-    suspect_id: document.getElementById('evidence-suspect-id').value || undefined,
-    type: document.getElementById('evidence-type').value,
-    platform: document.getElementById('evidence-platform').value.trim(),
-    content,
-    timestamp,
-    investigator: document.getElementById('evidence-investigator').value.trim(),
-    notes: document.getElementById('evidence-notes').value.trim(),
-  });
-
+  const fileInput = document.getElementById('evidence-files');
+  const files = Array.from(fileInput.files || []);
   const fb = document.getElementById('evidence-feedback');
-  fb.textContent = 'Evidence logged successfully.';
+
+  let attachments = [];
+  try {
+    attachments = await Promise.all(files.map(readFileAsBase64));
+  } catch (err) {
+    fb.textContent = 'Failed to read attachment.';
+    fb.className = 'feedback error';
+    fb.classList.remove('hidden');
+    return;
+  }
+
+  try {
+    await api(`/api/cases/${case_id}/evidence`, 'POST', {
+      suspect_id: document.getElementById('evidence-suspect-id').value || undefined,
+      type: document.getElementById('evidence-type').value,
+      platform: document.getElementById('evidence-platform').value.trim(),
+      content,
+      timestamp,
+      investigator: document.getElementById('evidence-investigator').value.trim(),
+      notes: document.getElementById('evidence-notes').value.trim(),
+      attachments,
+    });
+  } catch (err) {
+    fb.textContent = err.message || 'Failed to log evidence.';
+    fb.className = 'feedback error';
+    fb.classList.remove('hidden');
+    return;
+  }
+
+  fb.textContent = `Evidence logged${attachments.length ? ` with ${attachments.length} attachment(s)` : ''} and hashed.`;
   fb.className = 'feedback success';
   fb.classList.remove('hidden');
   document.getElementById('evidence-content').value = '';
   document.getElementById('evidence-notes').value = '';
-  setTimeout(() => fb.classList.add('hidden'), 3000);
+  fileInput.value = '';
+  document.getElementById('evidence-file-list').innerHTML = '';
+  setTimeout(() => fb.classList.add('hidden'), 4000);
 });
 
 // ---- Helpers ----
@@ -419,6 +568,51 @@ function fmtDate(iso) {
 function fmtType(t) {
   return { chat_log: 'Chat Log', screenshot_desc: 'Screenshot', profile_info: 'Profile Info', url: 'URL/Link', phone_call: 'Phone Log', other: 'Other' }[t] || t;
 }
+
+function fmtBytes(n) {
+  n = Number(n) || 0;
+  return n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`;
+}
+
+// ---- Global search ----
+const searchInput = document.getElementById('global-search');
+const searchResults = document.getElementById('search-results');
+let searchTimer;
+
+searchInput.addEventListener('input', function () {
+  const q = this.value.trim();
+  clearTimeout(searchTimer);
+  if (q.length < 2) { searchResults.classList.add('hidden'); return; }
+  searchTimer = setTimeout(() => runSearch(q), 220);
+});
+
+async function runSearch(q) {
+  const data = await api(`/api/search?q=${encodeURIComponent(q)}`);
+  if (!data.hits.length) {
+    searchResults.innerHTML = '<div class="search-empty">No matches</div>';
+    searchResults.classList.remove('hidden');
+    return;
+  }
+  const icon = { case: '📂', suspect: '👤', evidence: '🧾', lookup: '🔎' };
+  searchResults.innerHTML = data.hits.map((h) => `
+    <div class="search-hit" data-case="${h.case_id}">
+      <span class="sh-icon">${icon[h.type] || '•'}</span>
+      <span class="sh-main">${esc(h.label)}</span>
+      <span class="sh-sub">${esc(h.sub || '')}</span>
+    </div>`).join('');
+  searchResults.classList.remove('hidden');
+  searchResults.querySelectorAll('.search-hit').forEach((el) => {
+    el.addEventListener('click', () => {
+      searchResults.classList.add('hidden');
+      searchInput.value = '';
+      openCase(el.dataset.case);
+    });
+  });
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.nav-search')) searchResults.classList.add('hidden');
+});
 
 // Init
 loadCases();

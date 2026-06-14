@@ -57,6 +57,19 @@ function initDb() {
       results TEXT NOT NULL,
       searched_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS attachments (
+      id TEXT PRIMARY KEY,
+      evidence_id TEXT NOT NULL,
+      case_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      mime TEXT DEFAULT '',
+      size INTEGER DEFAULT 0,
+      sha256 TEXT NOT NULL,
+      stored_path TEXT NOT NULL,
+      added_at TEXT NOT NULL,
+      FOREIGN KEY(evidence_id) REFERENCES evidence(id)
+    );
   `);
 
   migrate();

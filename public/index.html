@@ -11,6 +11,10 @@
     <div class="nav-brand">
       <span class="icon">&#128269;</span> OSINT Investigation Dashboard
     </div>
+    <div class="nav-search">
+      <input type="text" id="global-search" placeholder="Search cases, suspects, evidence…" autocomplete="off" />
+      <div id="search-results" class="search-results hidden"></div>
+    </div>
     <div class="nav-links">
       <button class="nav-btn active" data-view="cases">Cases</button>
       <button class="nav-btn" data-view="lookup">Username Lookup</button>
@@ -94,6 +98,10 @@
           <textarea id="evidence-content" rows="6" placeholder="Paste chat log, describe screenshot, or enter any relevant text..."></textarea>
         </label>
         <label>Collected By (investigator) <input type="text" id="evidence-investigator" placeholder="Your name / handle" /></label>
+        <label>Attachments (screenshots / files)
+          <input type="file" id="evidence-files" multiple accept="image/*,.pdf,.txt,.eml,.html" />
+        </label>
+        <div id="evidence-file-list" class="file-list"></div>
         <label>Notes <input type="text" id="evidence-notes" placeholder="Optional notes about this evidence..." /></label>
         <button class="btn btn-primary" id="submit-evidence">Log Evidence</button>
         <div id="evidence-feedback" class="feedback hidden"></div>

@@ -7,9 +7,13 @@ refer them to law enforcement. It does three things:
    API (verified results) and builds candidate links for login-walled sites
    (manual confirmation).
 2. **Case management** — organizes suspects, identifiers, and a timestamped,
-   tamper-evident evidence log per case.
-3. **Report export** — produces a clean, court-friendly referral document with
+   tamper-evident evidence log per case, with screenshot/file attachments.
+3. **Report export** — produces a clean, court-friendly referral document
+   (plain text, printable HTML/PDF, or a full ZIP evidence bundle) with
    integrity hashes and the right agencies to send it to.
+
+Extra tooling: global search across every case, suspect, and evidence entry;
+a merged per-case activity timeline; and editable suspect profiles.
 
 Everything runs locally on your machine. No data leaves your computer except the
 lookup requests to public profile pages.
@@ -65,14 +69,27 @@ automatically, and git-ignored so it never gets committed).
 - Go to **Log Evidence**, pick the case, choose the type (chat log, screenshot
   description, profile info, URL, etc.), set the **actual time the event
   happened**, paste the content, and add your name as collector.
+- **Attach screenshots or files** — each is stored and hashed (SHA-256)
+  alongside the entry, and appears as a thumbnail in the case.
 - Every entry is **append-only** and stamped with a **SHA-256 integrity hash**.
   If anyone later alters the record, the dashboard and the report flag it as
   tampered. This is what makes the log credible to investigators.
 
-### 5. Export the report
-- Open the case → **Export LE Report**.
-- You get a plain-text file with the suspect summary, verified/manual lookup
-  results, the full evidence log with integrity status, and submission links.
+### 5. Export the report / evidence bundle
+Open the case and pick one of:
+- **Text Report** — a plain-text `.txt` referral document.
+- **Printable (PDF)** — opens a formatted HTML report; use your browser's
+  *Print → Save as PDF*. Screenshots are embedded inline.
+- **Evidence Bundle (.zip)** — the full chain-of-custody package: the text and
+  HTML reports, every attached file, and a `manifest.json` listing a SHA-256
+  hash for every file plus one overall "bundle anchor" hash. This is the
+  single artifact to hand to law enforcement.
+
+### Other tools
+- **Search bar** (top of the window) — find any case, suspect, or evidence text
+  instantly; click a result to jump to its case.
+- **Timeline tab** — a merged chronological view of all activity in a case.
+- **Suspects** can be edited or removed; evidence is intentionally permanent.
 
 ---
 
