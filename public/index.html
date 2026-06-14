@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OSINT Investigation Dashboard</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-brand">
+      <span class="icon">&#128269;</span> OSINT Investigation Dashboard
+    </div>
+    <div class="nav-links">
+      <button class="nav-btn active" data-view="cases">Cases</button>
+      <button class="nav-btn" data-view="lookup">Username Lookup</button>
+      <button class="nav-btn" data-view="evidence">Log Evidence</button>
+    </div>
+  </nav>
+
+  <main class="container">
+
+    <!-- CASES VIEW -->
+    <section id="view-cases" class="view active">
+      <div class="section-header">
+        <h2>Active Cases</h2>
+        <button class="btn btn-primary" id="btn-new-case">+ New Case</button>
+      </div>
+
+      <div id="new-case-form" class="card hidden">
+        <h3>Create New Case</h3>
+        <label>Case Alias / Codename <input type="text" id="case-alias" placeholder="e.g. Operation Nightfall" /></label>
+        <label>Initial Notes <textarea id="case-notes" rows="3" placeholder="Optional background info..."></textarea></label>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="submit-case">Create Case</button>
+          <button class="btn btn-ghost" id="cancel-case">Cancel</button>
+        </div>
+      </div>
+
+      <div id="cases-list" class="cards-grid"></div>
+    </section>
+
+    <!-- CASE DETAIL VIEW -->
+    <section id="view-case-detail" class="view hidden">
+      <button class="btn btn-ghost back-btn" id="back-to-cases">&#8592; Back to Cases</button>
+      <div id="case-detail-content"></div>
+    </section>
+
+    <!-- USERNAME LOOKUP VIEW -->
+    <section id="view-lookup" class="view hidden">
+      <div class="section-header"><h2>Username Lookup</h2></div>
+      <div class="card">
+        <p class="hint">Searches the username across 15+ platforms using public profile URLs. Results saved to the selected case.</p>
+        <label>Username (without @) <input type="text" id="lookup-username" placeholder="e.g. johndoe123" /></label>
+        <label>Attach to Case (optional)
+          <select id="lookup-case-id">
+            <option value="">— No case —</option>
+          </select>
+        </label>
+        <button class="btn btn-primary" id="run-lookup">Search All Platforms</button>
+      </div>
+      <div id="lookup-spinner" class="spinner hidden">Searching platforms<span class="dots"></span></div>
+      <div id="lookup-results"></div>
+    </section>
+
+    <!-- EVIDENCE VIEW -->
+    <section id="view-evidence" class="view hidden">
+      <div class="section-header"><h2>Log Evidence</h2></div>
+      <div class="card">
+        <label>Case
+          <select id="evidence-case-id">
+            <option value="">Select a case...</option>
+          </select>
+        </label>
+        <label>Suspect (optional)
+          <select id="evidence-suspect-id">
+            <option value="">— None —</option>
+          </select>
+        </label>
+        <label>Evidence Type
+          <select id="evidence-type">
+            <option value="chat_log">Chat Log</option>
+            <option value="screenshot_desc">Screenshot Description</option>
+            <option value="profile_info">Profile Information</option>
+            <option value="url">URL / Link</option>
+            <option value="phone_call">Phone Call Log</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
+        <label>Platform <input type="text" id="evidence-platform" placeholder="e.g. Instagram, Discord..." /></label>
+        <label>Timestamp of Evidence <input type="datetime-local" id="evidence-timestamp" /></label>
+        <label>Content / Description
+          <textarea id="evidence-content" rows="6" placeholder="Paste chat log, describe screenshot, or enter any relevant text..."></textarea>
+        </label>
+        <label>Notes <input type="text" id="evidence-notes" placeholder="Optional notes about this evidence..." /></label>
+        <button class="btn btn-primary" id="submit-evidence">Log Evidence</button>
+        <div id="evidence-feedback" class="feedback hidden"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
