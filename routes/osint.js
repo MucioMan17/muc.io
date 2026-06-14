@@ -1,6 +1,7 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../utils/db');
+const { investigate } = require('../utils/osint-engine');
 
 const router = express.Router();
 
@@ -75,6 +76,36 @@ router.post('/phone', (req, res) => {
   }
 
   res.json(result);
+});
+
+// POST /api/osint/investigate  { seeds: [{type, value}], case_id? }
+router.post('/investigate', async (req, res) => {
+  const { seeds, case_id } = req.body;
+  if (!Array.isArray(seeds) || !seeds.length) return res.status(400).json({ error: 'seeds array required' });
+
+  const valid = seeds
+    .filter((s) => s.type && s.value && typeof s.value === 'string' && s.value.trim())
+    .map((s) => ({ type: s.type, value: s.value.trim() }));
+  if (!valid.length) return res.status(400).json({ error: 'No valid seeds provided' });
+
+  try {
+    const result = await investigate(valid);
+
+    if (case_id) {
+      const db = getDb();
+      const exists = db.prepare('SELECT id FROM cases WHERE id = ?').get(case_id);
+      if (exists) {
+        const label = `investigate:${valid.map((s) => s.value).join(',')}`;
+        db.prepare(
+          `INSERT INTO lookup_results (id, case_id, username, results, searched_at) VALUES (?, ?, ?, ?, ?)`
+        ).run(uuidv4(), case_id, label, JSON.stringify(result.profile), result.investigated_at);
+      }
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = router;

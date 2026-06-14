@@ -17,6 +17,7 @@
     </div>
     <div class="nav-links">
       <button class="nav-btn active" data-view="cases">Cases</button>
+      <button class="nav-btn" data-view="investigate">Investigate</button>
       <button class="nav-btn" data-view="lookup">Username Lookup</button>
       <button class="nav-btn" data-view="osint">Email / Phone</button>
       <button class="nav-btn" data-view="evidence">Log Evidence</button>
@@ -50,6 +51,29 @@
     <section id="view-case-detail" class="view hidden">
       <button class="btn btn-ghost back-btn" id="back-to-cases">&#8592; Back to Cases</button>
       <div id="case-detail-content"></div>
+    </section>
+
+    <!-- INVESTIGATE VIEW -->
+    <section id="view-investigate" class="view hidden">
+      <div class="section-header"><h2>Deep Investigate</h2></div>
+      <div class="card">
+        <p class="hint">Add every identifier you have on a target — email, username, phone, or Discord. The engine enriches each one with real API calls, then automatically follows discovered leads (e.g. a GitHub public email becomes a new seed; Keybase reveals all cryptographically-verified social accounts).</p>
+        <div id="investigate-seeds"></div>
+        <div class="seed-add-row">
+          <button class="btn btn-ghost" id="add-seed-email">+ Email</button>
+          <button class="btn btn-ghost" id="add-seed-username">+ Username</button>
+          <button class="btn btn-ghost" id="add-seed-phone">+ Phone</button>
+          <button class="btn btn-ghost" id="add-seed-discord">+ Discord</button>
+        </div>
+        <label style="margin-top:0.75rem">Attach to Case (optional)
+          <select id="investigate-case-id">
+            <option value="">— No case —</option>
+          </select>
+        </label>
+        <button class="btn btn-primary" id="run-investigate">Investigate</button>
+      </div>
+      <div id="investigate-spinner" class="spinner hidden">Investigating<span class="dots"></span></div>
+      <div id="investigate-results"></div>
     </section>
 
     <!-- USERNAME LOOKUP VIEW -->

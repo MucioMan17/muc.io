@@ -18,7 +18,7 @@ function showView(name) {
   const el = document.getElementById(`view-${name}`);
   if (el) el.classList.add('active');
   if (name === 'cases') loadCases();
-  if (name === 'lookup' || name === 'evidence' || name === 'osint') loadCaseDropdowns();
+  if (name === 'lookup' || name === 'evidence' || name === 'osint' || name === 'investigate') loadCaseDropdowns();
 }
 
 // ---- Cases ----
@@ -557,7 +557,7 @@ document.getElementById('submit-evidence').addEventListener('click', async () =>
 // ---- Helpers ----
 async function loadCaseDropdowns() {
   const cases = await api('/api/cases');
-  ['lookup-case-id', 'evidence-case-id', 'osint-email-case', 'osint-phone-case'].forEach((selId) => {
+  ['lookup-case-id', 'evidence-case-id', 'osint-email-case', 'osint-phone-case', 'investigate-case-id'].forEach((selId) => {
     const sel = document.getElementById(selId);
     const first = sel.options[0];
     sel.innerHTML = '';
@@ -598,6 +598,187 @@ function fmtType(t) {
 function fmtBytes(n) {
   n = Number(n) || 0;
   return n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`;
+}
+
+// ---- Investigate ----
+function addSeedRow(type) {
+  const container = document.getElementById('investigate-seeds');
+  const placeholders = {
+    email: 'target@example.com',
+    username: 'johndoe123',
+    phone: '+1 555 000 0000',
+    discord: 'username, User#1234, or numeric ID',
+  };
+  const row = document.createElement('div');
+  row.className = 'seed-row';
+  row.innerHTML = `
+    <span class="seed-type-badge">${esc(type)}</span>
+    <input type="text" class="seed-input" placeholder="${placeholders[type] || ''}" data-type="${esc(type)}" />
+    <button class="icon-btn" onclick="this.closest('.seed-row').remove()">&#10005;</button>
+  `;
+  container.appendChild(row);
+  row.querySelector('input').focus();
+}
+
+['email', 'username', 'phone', 'discord'].forEach((type) => {
+  document.getElementById(`add-seed-${type}`).addEventListener('click', () => addSeedRow(type));
+});
+
+document.getElementById('run-investigate').addEventListener('click', async () => {
+  const inputs = document.querySelectorAll('#investigate-seeds .seed-input');
+  const seeds = Array.from(inputs)
+    .map((i) => ({ type: i.dataset.type, value: i.value.trim() }))
+    .filter((s) => s.value);
+
+  if (!seeds.length) return alert('Add at least one identifier to investigate.');
+
+  const case_id = document.getElementById('investigate-case-id').value;
+  document.getElementById('investigate-results').innerHTML = '';
+  document.getElementById('investigate-spinner').classList.remove('hidden');
+
+  try {
+    const data = await api('/api/osint/investigate', 'POST', { seeds, case_id: case_id || undefined });
+    document.getElementById('investigate-spinner').classList.add('hidden');
+    document.getElementById('investigate-results').innerHTML = renderInvestigateResults(data);
+  } catch (err) {
+    document.getElementById('investigate-spinner').classList.add('hidden');
+    document.getElementById('investigate-results').innerHTML = `<div class="feedback error" style="margin-top:1rem">${esc(err.message)}</div>`;
+  }
+});
+
+function renderInvestigateResults(data) {
+  const { profile, seeds, discovered } = data;
+  let html = '';
+
+  // ── Profile Summary Card ──────────────────────────────────────────
+  html += '<div class="profile-card">';
+  html += '<div class="profile-card-title">Aggregated Profile</div>';
+
+  if (profile.avatar_urls.length) {
+    html += `<div class="profile-avatars">${profile.avatar_urls.slice(0, 6).map((a) => `
+      <div class="avatar-item">
+        <img src="${esc(a.url)}" alt="${esc(a.platform)}" loading="lazy" onerror="this.parentElement.style.display='none'" />
+        <div class="avatar-label">${esc(a.platform)}</div>
+      </div>`).join('')}</div>`;
+  }
+
+  if (profile.possible_real_names.length) {
+    html += `<div class="profile-section">
+      <div class="ps-label">Possible Real Names</div>
+      <div class="tag-list">${profile.possible_real_names.map((n) => `<span class="tag name-tag">${esc(n)}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  if (profile.possible_locations.length) {
+    html += `<div class="profile-section">
+      <div class="ps-label">Possible Locations</div>
+      <div class="tag-list">${profile.possible_locations.map((l) => `<span class="tag">${esc(l)}</span>`).join('')}</div>
+    </div>`;
+  }
+
+  if (profile.confirmed_platforms.length) {
+    html += `<div class="profile-section">
+      <div class="ps-label">Confirmed Platforms (${profile.confirmed_platforms.length})</div>
+      <div class="platform-list">
+        ${profile.confirmed_platforms.map((p) => `
+          <a href="${esc(p.profile_url)}" target="_blank" rel="noreferrer noopener" class="platform-hit">
+            <span class="ph-name">${esc(p.platform)}</span>
+            <span class="ph-user">@${esc(p.username)}</span>
+          </a>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (profile.linked_accounts.length) {
+    html += `<div class="profile-section">
+      <div class="ps-label">Keybase-Verified Links</div>
+      <div class="platform-list">
+        ${profile.linked_accounts.map((la) => `
+          <a href="${esc(la.url || '#')}" target="_blank" rel="noreferrer noopener" class="platform-hit verified-hit">
+            <span class="ph-name">${esc(la.service)}</span>
+            <span class="ph-user">@${esc(la.username)}</span>
+            <span class="verified-badge">&#10003; verified</span>
+          </a>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  const hasIds = profile.all_usernames.length || profile.all_emails.length || profile.all_phones.length || profile.all_urls.length;
+  if (hasIds) {
+    html += '<div class="profile-section"><div class="ps-label">All Discovered Identifiers</div>';
+    if (profile.all_usernames.length) html += `<div class="id-row"><span class="id-label">Usernames</span><div class="tag-list">${profile.all_usernames.map((u) => `<span class="tag">@${esc(u)}</span>`).join('')}</div></div>`;
+    if (profile.all_emails.length)   html += `<div class="id-row"><span class="id-label">Emails</span><div class="tag-list">${profile.all_emails.map((e) => `<span class="tag">${esc(e)}</span>`).join('')}</div></div>`;
+    if (profile.all_phones.length)   html += `<div class="id-row"><span class="id-label">Phones</span><div class="tag-list">${profile.all_phones.map((p) => `<span class="tag">${esc(p)}</span>`).join('')}</div></div>`;
+    if (profile.all_urls.length)     html += `<div class="id-row"><span class="id-label">URLs</span><div class="tag-list">${profile.all_urls.map((u) => `<a href="${esc(u)}" target="_blank" rel="noreferrer noopener" class="tag url-tag">${esc(u)}</a>`).join('')}</div></div>`;
+    html += '</div>';
+  }
+
+  if (profile.account_ages.length) {
+    html += `<div class="profile-section">
+      <div class="ps-label">Account Ages (oldest first)</div>
+      <div class="age-list">
+        ${profile.account_ages.map((a) => `
+          <div class="age-item">
+            <span class="age-platform">${esc(a.platform)}</span>
+            <span class="age-date">${fmtDate(a.created_at)}</span>
+            ${a.age_days !== undefined ? `<span class="age-days">${a.age_days.toLocaleString()} days ago</span>` : ''}
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (!profile.confirmed_platforms.length && !profile.possible_real_names.length && !profile.linked_accounts.length) {
+    html += '<div class="empty-state" style="padding:1.5rem 0;text-align:left">No confirmed accounts found on API-accessible platforms. Use the manual check links below to investigate further.</div>';
+  }
+
+  html += '</div>';
+
+  // ── Per-seed manual check links ───────────────────────────────────
+  const allResults = [...seeds, ...discovered.filter((r) => r.type === 'username')];
+  const withLinks = allResults.filter((r) => {
+    const m = r.data?.manual_checks || [];
+    return m.length > 0;
+  });
+
+  if (withLinks.length) {
+    html += '<h3 style="margin:1.5rem 0 0.75rem;font-size:1rem">Manual Check Links</h3>';
+    for (const r of withLinks) {
+      html += renderSeedDetail(r);
+    }
+  }
+
+  return html;
+}
+
+function renderSeedDetail(r) {
+  const manualChecks = r.data?.manual_checks || [];
+  const source = r._source ? ` <span style="font-size:0.75rem;color:var(--text-muted)">← ${esc(r._source)}</span>` : '';
+  let extra = '';
+
+  if (r.type === 'email' && r.data?.gravatar?.found) {
+    const g = r.data.gravatar;
+    extra = `<div class="gravatar-row">
+      <img src="${esc(g.avatar_url)}" alt="Gravatar" class="gravatar-img" onerror="this.style.display='none'" />
+      <div>
+        <strong>Gravatar:</strong> ${esc(g.display_name || g.username || 'account found')}
+        ${g.about ? `<div class="gravatar-about">${esc(g.about)}</div>` : ''}
+        ${(g.accounts || []).length ? `<div class="gravatar-about">Linked: ${g.accounts.map((a) => esc(a.service) + ' @' + esc(a.username)).join(', ')}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  if (r.type === 'email' && r.data?.username_candidates?.length) {
+    extra += `<div class="ps-label" style="margin-bottom:0.3rem">Username candidates from email</div>
+      <div class="tag-list" style="margin-bottom:0.75rem">${r.data.username_candidates.slice(0, 8).map((u) => `<span class="tag">@${esc(u)}</span>`).join('')}</div>`;
+  }
+
+  if (!extra && !manualChecks.length) return '';
+
+  return `<div class="seed-detail-card">
+    <div class="seed-detail-header">${esc(r.type)}: <code>${esc(r.value)}</code>${source}</div>
+    ${extra}
+    ${manualChecks.length ? renderOsintLinks(manualChecks, r.value, r.type) : ''}
+  </div>`;
 }
 
 // ---- Email / Phone OSINT ----
