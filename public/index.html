@@ -72,6 +72,37 @@
         </label>
         <button class="btn btn-primary" id="run-investigate">Investigate</button>
       </div>
+
+      <!-- Power Tools status / install panel -->
+      <div class="power-tools-card" id="power-tools-card">
+        <div class="ptc-header">
+          <span class="ptc-title">&#9889; Power Tools</span>
+          <span class="ptc-sub">Install once — used automatically on every investigation</span>
+        </div>
+        <div class="ptc-tools">
+          <div class="ptc-tool" id="pt-holehe">
+            <div class="pt-info">
+              <span class="pt-name">holehe</span>
+              <span class="pt-desc">Checks 120+ sites for an email address</span>
+            </div>
+            <span class="pt-badge" id="holehe-badge">checking…</span>
+            <button class="btn btn-ghost pt-install-btn hidden" id="install-holehe" data-tool="holehe">Install</button>
+          </div>
+          <div class="ptc-tool" id="pt-sherlock">
+            <div class="pt-info">
+              <span class="pt-name">sherlock</span>
+              <span class="pt-desc">Finds a username across 400+ websites</span>
+            </div>
+            <span class="pt-badge" id="sherlock-badge">checking…</span>
+            <button class="btn btn-ghost pt-install-btn hidden" id="install-sherlock" data-tool="sherlock">Install</button>
+          </div>
+        </div>
+        <div id="pt-python-warn" class="pt-python-warn hidden">
+          ⚠️ Python not found. <a href="https://www.python.org/downloads/" target="_blank" rel="noreferrer noopener">Download Python</a> (tick "Add to PATH" during setup), then refresh this page.
+        </div>
+        <div id="install-log" class="install-log hidden"></div>
+      </div>
+
       <div id="investigate-spinner" class="spinner hidden">Investigating<span class="dots"></span></div>
       <div id="investigate-results"></div>
     </section>

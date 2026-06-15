@@ -25,6 +25,7 @@ function showView(name) {
   }
   if (name === 'cases') loadCases();
   if (name === 'lookup' || name === 'evidence' || name === 'osint' || name === 'investigate') loadCaseDropdowns();
+  if (name === 'investigate') loadToolsStatus();
 }
 
 // ---- Cases ----
@@ -894,6 +895,89 @@ function renderDiscordCard(r) {
     ${rows.length ? `<table class="pdc-table">${rows.map(([k, v]) => `<tr><td class="pdc-key">${esc(k)}</td><td class="pdc-val">${esc(v)}</td></tr>`).join('')}</table>` : ''}
   </div>`;
 }
+
+// ---- Power Tools panel ----
+async function loadToolsStatus() {
+  try {
+    const data = await api('/api/tools/status');
+    const hasPython = data.python && data.python.found;
+
+    if (!hasPython) {
+      document.getElementById('pt-python-warn').classList.remove('hidden');
+    }
+
+    for (const tool of ['holehe', 'sherlock']) {
+      const badge = document.getElementById(`${tool}-badge`);
+      const btn   = document.getElementById(`install-${tool}`);
+      const installed = data[tool] && data[tool].installed;
+      if (installed) {
+        badge.textContent = '✓ installed';
+        badge.className = 'pt-badge pt-installed';
+        btn.classList.add('hidden');
+      } else {
+        badge.textContent = 'not installed';
+        badge.className = 'pt-badge pt-missing';
+        if (hasPython) btn.classList.remove('hidden');
+      }
+    }
+  } catch {
+    ['holehe-badge','sherlock-badge'].forEach(id => { document.getElementById(id).textContent = 'status unknown'; });
+  }
+}
+
+function startInstall(tool) {
+  const log   = document.getElementById('install-log');
+  const badge = document.getElementById(`${tool}-badge`);
+  const btn   = document.getElementById(`install-${tool}`);
+
+  log.innerHTML = '';
+  log.classList.remove('hidden');
+  badge.textContent = 'installing…';
+  badge.className = 'pt-badge pt-installing';
+  btn.disabled = true;
+
+  const addLine = (text, cls = '') => {
+    const line = document.createElement('div');
+    line.className = 'il-line' + (cls ? ' ' + cls : '');
+    line.textContent = text;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+  };
+
+  const es = new EventSource(`/api/tools/install/${encodeURIComponent(tool)}`);
+
+  es.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'log') {
+      addLine(msg.text);
+    } else if (msg.type === 'done') {
+      es.close();
+      btn.disabled = false;
+      if (msg.success) {
+        addLine(msg.msg, 'il-success');
+        badge.textContent = '✓ installed';
+        badge.className = 'pt-badge pt-installed';
+        btn.classList.add('hidden');
+        showToast(`${tool} installed — your next search will use it!`);
+      } else {
+        addLine(msg.msg, 'il-error');
+        badge.textContent = 'install failed';
+        badge.className = 'pt-badge pt-missing';
+      }
+    }
+  };
+
+  es.onerror = () => {
+    es.close();
+    addLine('Connection lost — check the terminal running muc.io.', 'il-error');
+    btn.disabled = false;
+    badge.textContent = 'error';
+    badge.className = 'pt-badge pt-missing';
+  };
+}
+
+document.getElementById('install-holehe').addEventListener('click', () => startInstall('holehe'));
+document.getElementById('install-sherlock').addEventListener('click', () => startInstall('sherlock'));
 
 function renderAccountFinder(r) {
   if (r.type !== 'email') return '';

@@ -499,6 +499,45 @@ input[type="file"] {
 .rev-img-links a { font-size: 0.72rem; color: var(--accent); text-decoration: none; background: rgba(79,125,255,0.1); padding: 0.15rem 0.45rem; border-radius: 99px; }
 .rev-img-links a:hover { background: rgba(79,125,255,0.2); }
 
+/* ===== Power Tools panel ===== */
+.power-tools-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 1.1rem 1.4rem; margin-bottom: 1rem;
+}
+.ptc-header { display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.85rem; }
+.ptc-title { font-weight: 700; font-size: 0.9rem; color: var(--accent); }
+.ptc-sub { font-size: 0.76rem; color: var(--text-muted); }
+.ptc-tools { display: flex; flex-direction: column; gap: 0.55rem; }
+.ptc-tool {
+  display: flex; align-items: center; gap: 0.75rem;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 0.55rem 0.85rem;
+}
+.pt-info { flex: 1; min-width: 0; }
+.pt-name { font-weight: 700; font-size: 0.85rem; font-family: monospace; color: var(--text); margin-right: 0.5rem; }
+.pt-desc { font-size: 0.76rem; color: var(--text-muted); }
+.pt-badge {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.03em;
+  padding: 0.18rem 0.6rem; border-radius: 99px; flex-shrink: 0; white-space: nowrap;
+}
+.pt-installed  { background: rgba(62,207,142,0.15); color: var(--success); }
+.pt-missing    { background: rgba(224,92,92,0.13);  color: var(--danger); }
+.pt-installing { background: rgba(245,166,35,0.15); color: var(--warning); }
+.pt-install-btn { font-size: 0.78rem; padding: 0.3rem 0.75rem; flex-shrink: 0; }
+.pt-python-warn {
+  margin-top: 0.75rem; font-size: 0.8rem; color: var(--warning);
+  background: rgba(245,166,35,0.08); border: 1px solid rgba(245,166,35,0.25);
+  border-radius: 6px; padding: 0.5rem 0.75rem;
+}
+.pt-python-warn a { color: var(--accent); }
+
+.install-log {
+  margin-top: 0.85rem; background: #0a0c10; border: 1px solid var(--border); border-radius: 6px;
+  padding: 0.75rem; max-height: 180px; overflow-y: auto; font-family: monospace; font-size: 0.75rem;
+}
+.il-line { color: #94a3b8; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+.il-success { color: var(--success); font-weight: 700; }
+.il-error   { color: var(--danger);  font-weight: 700; }
+
 /* ===== Account finder (email registration checks) ===== */
 .account-finder {
   background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
