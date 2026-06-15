@@ -1,4 +1,4 @@
-const Database = require('better-sqlite3');
+const { DatabaseSync } = require('node:sqlite');
 const fs = require('fs');
 const path = require('path');
 
@@ -9,8 +9,8 @@ let db;
 function initDb() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
-  db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
+  db = new DatabaseSync(DB_PATH);
+  db.exec('PRAGMA journal_mode = WAL');
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS cases (

@@ -114,14 +114,19 @@ router.delete('/:id', (req, res) => {
   const existing = db.prepare('SELECT id FROM cases WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Case not found' });
 
-  const tx = db.transaction((id) => {
+  const id = req.params.id;
+  db.exec('BEGIN');
+  try {
     db.prepare('DELETE FROM attachments WHERE case_id = ?').run(id);
     db.prepare('DELETE FROM evidence WHERE case_id = ?').run(id);
     db.prepare('DELETE FROM suspects WHERE case_id = ?').run(id);
     db.prepare('DELETE FROM lookup_results WHERE case_id = ?').run(id);
     db.prepare('DELETE FROM cases WHERE id = ?').run(id);
-  });
-  tx(req.params.id);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
 
   fs.rmSync(path.join(ATTACH_DIR, req.params.id), { recursive: true, force: true });
   res.json({ success: true });
@@ -238,7 +243,8 @@ router.post('/:id/evidence', (req, res) => {
   const caseDir = path.join(ATTACH_DIR, req.params.id);
   fs.mkdirSync(caseDir, { recursive: true });
 
-  const tx = db.transaction(() => {
+  db.exec('BEGIN');
+  try {
     insertEvidence.run(
       id, req.params.id, suspect_id || null, type, platform || '',
       content, record.timestamp, now, investigator || '', hash, notes || ''
@@ -249,8 +255,11 @@ router.post('/:id/evidence', (req, res) => {
       insertAttach.run(a.id, id, req.params.id, a.filename, a.mime, a.buf.length, a.sha256, diskName, now);
     }
     db.prepare('UPDATE cases SET updated_at=? WHERE id=?').run(now, req.params.id);
-  });
-  tx();
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
 
   res.status(201).json({
     id,
