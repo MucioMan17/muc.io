@@ -753,7 +753,126 @@ function renderInvestigateResults(data) {
     }
   }
 
+  // ── Per-platform extracted data ───────────────────────────────────
+  const allResultsForData = [...seeds, ...discovered];
+  const platformCards = [];
+  for (const r of allResultsForData) {
+    if (r.type === 'username' && r.data?.platforms) {
+      for (const [platName, d] of Object.entries(r.data.platforms)) {
+        if (d.found) platformCards.push(renderPlatformCard(platName, r.value, d, r._source));
+      }
+    }
+    if (r.type === 'discord' && r.data?.id) {
+      platformCards.push(renderDiscordCard(r));
+    }
+  }
+  if (platformCards.length) {
+    html += '<h3 style="margin:1.5rem 0 0.75rem;font-size:1rem">Extracted Data</h3>';
+    html += `<div class="platform-data-grid">${platformCards.join('')}</div>`;
+  }
+
   return html;
+}
+
+function renderPlatformCard(platName, username, d, source) {
+  const rows = [];
+  const add = (label, val) => { if (val !== null && val !== undefined && val !== '') rows.push([label, String(val)]); };
+
+  add('Name',         d.name || d.full_name || d.real_name || d.display_name || d.persona_name);
+  add('Bio',          d.bio ? d.bio.slice(0, 280) + (d.bio.length > 280 ? '…' : '') : null);
+  add('About',        d.about ? d.about.slice(0, 280) : null);
+  add('Location',     d.location || d.city);
+  add('Country',      d.country);
+  add('Organization', d.organization);
+  add('Email',        d.email);
+  add('Twitter',      d.twitter ? `@${d.twitter}` : null);
+  add('GitHub',       d.github ? `@${d.github}` : null);
+  add('Website',      d.website);
+  add('Followers',    d.followers !== undefined ? d.followers.toLocaleString() : null);
+  add('Reddit karma', d.total_karma !== undefined ? d.total_karma.toLocaleString() : null);
+  add('Duolingo XP',  d.total_xp !== undefined ? d.total_xp.toLocaleString() : null);
+  add('Streak',       d.streak !== undefined ? `${d.streak} days` : null);
+  add('Languages',    d.languages?.length ? d.languages.join(', ') : null);
+  add('Blitz rating', d.blitz_rating);
+  add('Rapid rating', d.rapid_rating);
+  add('Bullet rating',d.bullet_rating);
+  add('CF rating',    d.rating ? `${d.rating} (${d.rank || ''})` : null);
+  add('HN karma',     d.karma !== undefined ? d.karma.toLocaleString() : null);
+  add('Posts',        d.submission_count !== undefined ? d.submission_count.toLocaleString() : null);
+  add('Friends',      d.friend_count !== undefined && d.friend_count !== null ? d.friend_count.toLocaleString() : null);
+  add('Steam display',d.persona_name);
+  add('VAC banned',   d.vac_bans ? '⚠️ YES' : null);
+  add('Banned',       d.is_banned ? '⚠️ YES' : null);
+  add('Visibility',   d.visibility === 'Private' ? '🔒 Private profile' : null);
+  if (d.recent_subreddits?.length) add('Active on', d.recent_subreddits.map(s => 'r/' + s).join(', '));
+  if (d.recent_repos?.length) add('Recent repos', d.recent_repos.map(r => r.name + (r.language ? ` (${r.language})` : '')).join(', '));
+  if (d.linked_accounts?.length) {
+    const verified = d.linked_accounts.filter(a => a.state === 'verified');
+    if (verified.length) add('Keybase links', verified.map(a => `${a.service} @${a.username}`).join(', '));
+  }
+  add('Joined', (() => {
+    const ts = d.created_at || d.joined || d.registration_time;
+    return ts ? new Date(ts).toLocaleDateString() : null;
+  })());
+  if (d.account_age_days !== undefined && d.account_age_days !== null) {
+    add('Account age', `${d.account_age_days.toLocaleString()} days`);
+  }
+
+  const avatarHtml = d.avatar_url
+    ? `<img src="${esc(d.avatar_url)}" alt="" class="pdc-avatar" onerror="this.style.display='none'" />`
+    : '';
+  const sourceHtml = source ? `<div class="pdc-source">via ${esc(source)}</div>` : '';
+  const revImgHtml = d.avatar_url ? `<div class="rev-img-links">
+    <span style="font-size:0.7rem;color:var(--text-muted)">Reverse image:</span>
+    <a href="https://www.google.com/searchbyimage?image_url=${encodeURIComponent(d.avatar_url)}" target="_blank" rel="noreferrer noopener">Google</a>
+    <a href="https://tineye.com/search?url=${encodeURIComponent(d.avatar_url)}" target="_blank" rel="noreferrer noopener">TinEye</a>
+    <a href="https://yandex.com/images/search?url=${encodeURIComponent(d.avatar_url)}&rpt=imageview" target="_blank" rel="noreferrer noopener">Yandex</a>
+  </div>` : '';
+
+  return `<div class="platform-data-card">
+    <div class="pdc-header">
+      ${avatarHtml}
+      <div style="flex:1;min-width:0">
+        <div class="pdc-name">${esc(platName)}</div>
+        <div class="pdc-user">@${esc(username)}</div>
+        ${sourceHtml}
+        ${d.profile_url ? `<a href="${esc(d.profile_url)}" target="_blank" rel="noreferrer noopener" class="pdc-link">View Profile ↗</a>` : ''}
+      </div>
+    </div>
+    ${revImgHtml}
+    ${rows.length ? `<table class="pdc-table">${rows.map(([k, v]) => `<tr><td class="pdc-key">${esc(k)}</td><td class="pdc-val">${esc(v)}</td></tr>`).join('')}</table>` : ''}
+  </div>`;
+}
+
+function renderDiscordCard(r) {
+  const d = r.data;
+  const rows = [];
+  if (d.global_name)  rows.push(['Display name', d.global_name]);
+  if (d.username)     rows.push(['Username', d.username]);
+  if (d.created_at)   rows.push(['Account created', new Date(d.created_at).toLocaleDateString()]);
+  if (d.badges?.length) rows.push(['Badges', d.badges.join(', ')]);
+
+  const avatarHtml = d.avatar_url
+    ? `<img src="${esc(d.avatar_url)}" alt="" class="pdc-avatar" onerror="this.style.display='none'" />`
+    : '';
+  const revImgHtml = d.avatar_url ? `<div class="rev-img-links">
+    <span style="font-size:0.7rem;color:var(--text-muted)">Reverse image:</span>
+    <a href="https://www.google.com/searchbyimage?image_url=${encodeURIComponent(d.avatar_url)}" target="_blank" rel="noreferrer noopener">Google</a>
+    <a href="https://tineye.com/search?url=${encodeURIComponent(d.avatar_url)}" target="_blank" rel="noreferrer noopener">TinEye</a>
+  </div>` : '';
+
+  return `<div class="platform-data-card">
+    <div class="pdc-header">
+      ${avatarHtml}
+      <div style="flex:1;min-width:0">
+        <div class="pdc-name">Discord</div>
+        <div class="pdc-user">ID: ${esc(d.id || r.value)}</div>
+        <a href="https://discord.com/users/${esc(d.id || r.value)}" target="_blank" rel="noreferrer noopener" class="pdc-link">View Profile ↗</a>
+      </div>
+    </div>
+    ${revImgHtml}
+    ${rows.length ? `<table class="pdc-table">${rows.map(([k, v]) => `<tr><td class="pdc-key">${esc(k)}</td><td class="pdc-val">${esc(v)}</td></tr>`).join('')}</table>` : ''}
+  </div>`;
 }
 
 function renderSeedDetail(r) {

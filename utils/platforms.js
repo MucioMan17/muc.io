@@ -151,6 +151,77 @@ const RELIABLE = [
       return UNKNOWN; // 301/302 redirect to tumblr.com is ambiguous (often a block)
     },
   },
+  {
+    name: 'Duolingo',
+    url: (u) => `https://www.duolingo.com/profile/${u}`,
+    check: async (u) => {
+      const r = await axios.get(`https://www.duolingo.com/2017-06-30/users?username=${encodeURIComponent(u)}`, {
+        headers: { 'User-Agent': UA }, validateStatus: null,
+      });
+      if (r.status !== 200 || !r.data?.users?.length) return NOT_FOUND;
+      return r.data.users[0]?.username?.toLowerCase() === u.toLowerCase() ? FOUND : NOT_FOUND;
+    },
+  },
+  {
+    name: 'Chess.com',
+    url: (u) => `https://www.chess.com/member/${u}`,
+    check: async (u) => {
+      const r = await axios.get(`https://api.chess.com/pub/player/${encodeURIComponent(u.toLowerCase())}`, {
+        headers: { 'User-Agent': UA }, validateStatus: null,
+      });
+      if (r.status === 200 && r.data?.username) return FOUND;
+      if (r.status === 404) return NOT_FOUND;
+      return UNKNOWN;
+    },
+  },
+  {
+    name: 'Lichess',
+    url: (u) => `https://lichess.org/@/${u}`,
+    check: async (u) => {
+      const r = await axios.get(`https://lichess.org/api/user/${encodeURIComponent(u)}`, {
+        headers: { 'User-Agent': UA }, validateStatus: null,
+      });
+      if (r.status === 200 && r.data?.username) return FOUND;
+      if (r.status === 404) return NOT_FOUND;
+      return UNKNOWN;
+    },
+  },
+  {
+    name: 'HackerNews',
+    url: (u) => `https://news.ycombinator.com/user?id=${u}`,
+    check: async (u) => {
+      const r = await axios.get(`https://hacker-news.firebaseio.com/v0/user/${encodeURIComponent(u)}.json`, {
+        headers: { 'User-Agent': UA }, validateStatus: null,
+      });
+      if (r.status === 200 && r.data && r.data.id) return FOUND;
+      if (r.status === 200 && r.data === null) return NOT_FOUND;
+      return UNKNOWN;
+    },
+  },
+  {
+    name: 'Dev.to',
+    url: (u) => `https://dev.to/${u}`,
+    check: async (u) => {
+      const r = await axios.get(`https://dev.to/api/users/by_username?url=${encodeURIComponent(u)}`, {
+        headers: { 'User-Agent': UA }, validateStatus: null,
+      });
+      if (r.status === 200 && r.data?.username) return FOUND;
+      if (r.status === 404) return NOT_FOUND;
+      return UNKNOWN;
+    },
+  },
+  {
+    name: 'Codeforces',
+    url: (u) => `https://codeforces.com/profile/${u}`,
+    check: async (u) => {
+      const r = await axios.get(`https://codeforces.com/api/user.info?handles=${encodeURIComponent(u)}`, {
+        headers: { 'User-Agent': UA }, validateStatus: null,
+      });
+      if (r.status === 200 && r.data?.status === 'OK' && r.data?.result?.length) return FOUND;
+      if (r.data?.comment?.includes('not found')) return NOT_FOUND;
+      return UNKNOWN;
+    },
+  },
 ];
 
 // ---- Manual-verification platforms (URL only, never auto-confirmed) ----
