@@ -36,5 +36,5 @@ app.use((err, req, res, next) => {
 
 initDb();
 app.listen(PORT, () => {
-  console.log(`OSINT Dashboard running at http://localhost:${PORT}`);
+  console.log(`muc.io running at http://localhost:${PORT}`);
 });

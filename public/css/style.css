@@ -43,6 +43,10 @@ body {
 }
 
 .nav-brand .icon { margin-right: 0.5rem; }
+.nav-tagline {
+  font-size: 0.7rem; font-weight: 500; color: var(--text-muted);
+  letter-spacing: 0.04em; margin-left: 0.35rem;
+}
 
 .nav-links { display: flex; gap: 0.5rem; }
 

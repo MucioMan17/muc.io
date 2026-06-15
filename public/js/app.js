@@ -1,5 +1,5 @@
 // ============================================================
-// OSINT Investigation Dashboard — Frontend
+// muc.io — Investigation Toolkit — Frontend
 // ============================================================
 
 let currentCaseId = null;
@@ -14,9 +14,15 @@ document.querySelectorAll('.nav-btn').forEach((btn) => {
 });
 
 function showView(name) {
-  document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
+  document.querySelectorAll('.view').forEach((v) => {
+    v.classList.remove('active');
+    v.classList.add('hidden');
+  });
   const el = document.getElementById(`view-${name}`);
-  if (el) el.classList.add('active');
+  if (el) {
+    el.classList.remove('hidden');
+    el.classList.add('active');
+  }
   if (name === 'cases') loadCases();
   if (name === 'lookup' || name === 'evidence' || name === 'osint' || name === 'investigate') loadCaseDropdowns();
 }

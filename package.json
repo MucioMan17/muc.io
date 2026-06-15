@@ -1,7 +1,7 @@
 {
-  "name": "predator-osint-dashboard",
+  "name": "muc.io",
   "version": "1.0.0",
-  "description": "OSINT dashboard for online predator investigation and law enforcement referral",
+  "description": "muc.io — investigation toolkit for gathering and correlating information on online predators",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
