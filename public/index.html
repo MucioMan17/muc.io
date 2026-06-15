@@ -7,197 +7,71 @@
   <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
-  <nav class="navbar">
-    <div class="nav-brand">
-      <span class="icon">&#128269;</span> muc.io <span class="nav-tagline">Investigation Toolkit</span>
+  <header class="topbar">
+    <div class="nav-brand"><span class="icon">&#128269;</span> muc.io</div>
+    <span class="topbar-tag">Ultimate Lookup</span>
+  </header>
+
+  <main class="hero">
+    <h1 class="hero-title">Enter anything. Find everything.</h1>
+    <p class="hero-sub">
+      Drop in an email, username, phone number, or Discord ID. muc.io pulls live
+      data from dozens of platforms and automatically chases every new lead it
+      uncovers — names, avatars, linked accounts, and more.
+    </p>
+
+    <div class="search-box">
+      <input type="text" id="seed-input"
+             placeholder="email  ·  username  ·  phone  ·  Discord ID"
+             autocomplete="off" spellcheck="false" />
+      <button class="btn btn-add" id="add-seed">+ Add</button>
     </div>
-    <div class="nav-search">
-      <input type="text" id="global-search" placeholder="Search cases, suspects, evidence…" autocomplete="off" />
-      <div id="search-results" class="search-results hidden"></div>
-    </div>
-    <div class="nav-links">
-      <button class="nav-btn active" data-view="cases">Cases</button>
-      <button class="nav-btn" data-view="investigate">Investigate</button>
-      <button class="nav-btn" data-view="lookup">Username Lookup</button>
-      <button class="nav-btn" data-view="osint">Email / Phone</button>
-      <button class="nav-btn" data-view="evidence">Log Evidence</button>
-    </div>
-  </nav>
+    <div class="detected-hint" id="detected-hint">&nbsp;</div>
 
-  <main class="container">
+    <div id="seed-chips" class="seed-chips"></div>
 
-    <!-- CASES VIEW -->
-    <section id="view-cases" class="view active">
-      <div class="section-header">
-        <h2>Active Cases</h2>
-        <button class="btn btn-primary" id="btn-new-case">+ New Case</button>
-      </div>
+    <button class="btn btn-investigate" id="run-investigate">
+      <span>&#128269;</span> Investigate Everything
+    </button>
 
-      <div id="new-case-form" class="card hidden">
-        <h3>Create New Case</h3>
-        <label>Case Alias / Codename <input type="text" id="case-alias" placeholder="e.g. Operation Nightfall" /></label>
-        <label>Lead Investigator <input type="text" id="case-lead" placeholder="Your name / handle (for the report)" /></label>
-        <label>Initial Notes <textarea id="case-notes" rows="3" placeholder="Optional background info..."></textarea></label>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="submit-case">Create Case</button>
-          <button class="btn btn-ghost" id="cancel-case">Cancel</button>
-        </div>
-      </div>
-
-      <div id="cases-list" class="cards-grid"></div>
-    </section>
-
-    <!-- CASE DETAIL VIEW -->
-    <section id="view-case-detail" class="view hidden">
-      <button class="btn btn-ghost back-btn" id="back-to-cases">&#8592; Back to Cases</button>
-      <div id="case-detail-content"></div>
-    </section>
-
-    <!-- INVESTIGATE VIEW -->
-    <section id="view-investigate" class="view hidden">
-      <div class="section-header"><h2>Deep Investigate</h2></div>
-      <div class="card">
-        <p class="hint">Add every identifier you have on a target — email, username, phone, or Discord. The engine enriches each one with real API calls, then automatically follows discovered leads (e.g. a GitHub public email becomes a new seed; Keybase reveals all cryptographically-verified social accounts).</p>
-        <div id="investigate-seeds"></div>
-        <div class="seed-add-row">
-          <button class="btn btn-ghost" id="add-seed-email">+ Email</button>
-          <button class="btn btn-ghost" id="add-seed-username">+ Username</button>
-          <button class="btn btn-ghost" id="add-seed-phone">+ Phone</button>
-          <button class="btn btn-ghost" id="add-seed-discord">+ Discord</button>
-        </div>
-        <label style="margin-top:0.75rem">Attach to Case (optional)
-          <select id="investigate-case-id">
-            <option value="">— No case —</option>
-          </select>
-        </label>
-        <button class="btn btn-primary" id="run-investigate">Investigate</button>
-      </div>
-
-      <!-- Power Tools status / install panel -->
-      <div class="power-tools-card" id="power-tools-card">
-        <div class="ptc-header">
-          <span class="ptc-title">&#9889; Power Tools</span>
-          <span class="ptc-sub">Install once — used automatically on every investigation</span>
-        </div>
-        <div class="ptc-tools">
-          <div class="ptc-tool" id="pt-holehe">
-            <div class="pt-info">
-              <span class="pt-name">holehe</span>
-              <span class="pt-desc">Checks 120+ sites for an email address</span>
-            </div>
-            <span class="pt-badge" id="holehe-badge">checking…</span>
-            <button class="btn btn-ghost pt-install-btn hidden" id="install-holehe" data-tool="holehe">Install</button>
+    <!-- Optional Power Tools -->
+    <details class="power-tools-card" id="power-tools-card">
+      <summary class="ptc-summary">
+        <span class="ptc-title">&#9889; Power Tools</span>
+        <span class="ptc-sub">Optional — install once for much deeper coverage</span>
+      </summary>
+      <div class="ptc-tools">
+        <div class="ptc-tool" id="pt-holehe">
+          <div class="pt-info">
+            <span class="pt-name">holehe</span>
+            <span class="pt-desc">Checks 120+ sites for an email address</span>
           </div>
-          <div class="ptc-tool" id="pt-sherlock">
-            <div class="pt-info">
-              <span class="pt-name">sherlock</span>
-              <span class="pt-desc">Finds a username across 400+ websites</span>
-            </div>
-            <span class="pt-badge" id="sherlock-badge">checking…</span>
-            <button class="btn btn-ghost pt-install-btn hidden" id="install-sherlock" data-tool="sherlock">Install</button>
+          <span class="pt-badge" id="holehe-badge">checking&hellip;</span>
+          <button class="btn btn-ghost pt-install-btn hidden" id="install-holehe" data-tool="holehe">Install</button>
+        </div>
+        <div class="ptc-tool" id="pt-sherlock">
+          <div class="pt-info">
+            <span class="pt-name">sherlock</span>
+            <span class="pt-desc">Finds a username across 400+ websites</span>
           </div>
-        </div>
-        <div id="pt-python-warn" class="pt-python-warn hidden">
-          ⚠️ Python not found. <a href="https://www.python.org/downloads/" target="_blank" rel="noreferrer noopener">Download Python</a> (tick "Add to PATH" during setup), then refresh this page.
-        </div>
-        <div id="install-log" class="install-log hidden"></div>
-      </div>
-
-      <div id="investigate-spinner" class="spinner hidden">Investigating<span class="dots"></span></div>
-      <div id="investigate-results"></div>
-    </section>
-
-    <!-- USERNAME LOOKUP VIEW -->
-    <section id="view-lookup" class="view hidden">
-      <div class="section-header"><h2>Username Lookup</h2></div>
-      <div class="card">
-        <p class="hint">Verifies the username against platforms with public APIs (GitHub, Reddit, Steam, Roblox, Telegram, Keybase, GitLab, Tumblr) and builds candidate links for login-walled sites that need manual confirmation. <strong>"Manual check" links are leads, not confirmed matches</strong> — verify by eye before attributing. Results save to the selected case.</p>
-        <label>Username (without @) <input type="text" id="lookup-username" placeholder="e.g. johndoe123" /></label>
-        <label>Attach to Case (optional)
-          <select id="lookup-case-id">
-            <option value="">— No case —</option>
-          </select>
-        </label>
-        <button class="btn btn-primary" id="run-lookup">Search All Platforms</button>
-      </div>
-      <div id="lookup-spinner" class="spinner hidden">Searching platforms<span class="dots"></span></div>
-      <div id="lookup-results"></div>
-    </section>
-
-    <!-- EMAIL / PHONE OSINT VIEW -->
-    <section id="view-osint" class="view hidden">
-      <div class="section-header"><h2>Email &amp; Phone Lookup</h2></div>
-
-      <div class="osint-grid">
-        <div class="card">
-          <h3>Email Address</h3>
-          <p class="hint">Generates direct links to breach databases, caller-ID tools, and OSINT search engines for this email. Each link opens in a new tab so you check it yourself.</p>
-          <label>Email address <input type="email" id="osint-email" placeholder="target@example.com" /></label>
-          <label>Attach to Case (optional)
-            <select id="osint-email-case">
-              <option value="">— No case —</option>
-            </select>
-          </label>
-          <button class="btn btn-primary" id="run-email-osint">Look Up Email</button>
-          <div id="email-osint-results"></div>
-        </div>
-
-        <div class="card">
-          <h3>Phone Number</h3>
-          <p class="hint">Generates direct links to caller-ID databases and phone lookup tools for this number.</p>
-          <label>Phone number <input type="tel" id="osint-phone" placeholder="+1 555 000 0000" /></label>
-          <label>Attach to Case (optional)
-            <select id="osint-phone-case">
-              <option value="">— No case —</option>
-            </select>
-          </label>
-          <button class="btn btn-primary" id="run-phone-osint">Look Up Phone</button>
-          <div id="phone-osint-results"></div>
+          <span class="pt-badge" id="sherlock-badge">checking&hellip;</span>
+          <button class="btn btn-ghost pt-install-btn hidden" id="install-sherlock" data-tool="sherlock">Install</button>
         </div>
       </div>
-    </section>
-
-    <!-- EVIDENCE VIEW -->
-    <section id="view-evidence" class="view hidden">
-      <div class="section-header"><h2>Log Evidence</h2></div>
-      <div class="card">
-        <label>Case
-          <select id="evidence-case-id">
-            <option value="">Select a case...</option>
-          </select>
-        </label>
-        <label>Suspect (optional)
-          <select id="evidence-suspect-id">
-            <option value="">— None —</option>
-          </select>
-        </label>
-        <label>Evidence Type
-          <select id="evidence-type">
-            <option value="chat_log">Chat Log</option>
-            <option value="screenshot_desc">Screenshot Description</option>
-            <option value="profile_info">Profile Information</option>
-            <option value="url">URL / Link</option>
-            <option value="phone_call">Phone Call Log</option>
-            <option value="other">Other</option>
-          </select>
-        </label>
-        <label>Platform <input type="text" id="evidence-platform" placeholder="e.g. Instagram, Discord..." /></label>
-        <label>Timestamp of Evidence <input type="datetime-local" id="evidence-timestamp" /></label>
-        <label>Content / Description
-          <textarea id="evidence-content" rows="6" placeholder="Paste chat log, describe screenshot, or enter any relevant text..."></textarea>
-        </label>
-        <label>Collected By (investigator) <input type="text" id="evidence-investigator" placeholder="Your name / handle" /></label>
-        <label>Attachments (screenshots / files)
-          <input type="file" id="evidence-files" multiple accept="image/*,.pdf,.txt,.eml,.html" />
-        </label>
-        <div id="evidence-file-list" class="file-list"></div>
-        <label>Notes <input type="text" id="evidence-notes" placeholder="Optional notes about this evidence..." /></label>
-        <button class="btn btn-primary" id="submit-evidence">Log Evidence</button>
-        <div id="evidence-feedback" class="feedback hidden"></div>
+      <div id="pt-python-warn" class="pt-python-warn hidden">
+        &#9888;&#65039; Python not found.
+        <a href="https://www.python.org/downloads/" target="_blank" rel="noreferrer noopener">Download Python</a>
+        (tick &quot;Add to PATH&quot; during setup), then refresh this page.
       </div>
-    </section>
-
+      <div id="install-log" class="install-log hidden"></div>
+    </details>
   </main>
+
+  <section class="results-wrap">
+    <div id="investigate-spinner" class="spinner hidden">Investigating<span class="dots"></span></div>
+    <div id="report-actions" class="report-actions-bar hidden"></div>
+    <div id="investigate-results"></div>
+  </section>
 
   <script src="/js/app.js"></script>
 </body>
