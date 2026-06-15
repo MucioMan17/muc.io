@@ -188,6 +188,9 @@ async function enrichUsername(username) {
     { name: 'HackerNews', fn: () => enrichHackerNews(username) },
     { name: 'Dev.to',     fn: () => enrichDevTo(username) },
     { name: 'Codeforces', fn: () => enrichCodeforces(username) },
+    { name: 'Minecraft',  fn: () => enrichMinecraft(username) },
+    { name: 'Scratch',    fn: () => enrichScratch(username) },
+    { name: 'Twitch',     fn: () => enrichTwitch(username) },
   ];
 
   const [checks, sherlock] = await Promise.all([
@@ -220,21 +223,40 @@ async function enrichUsername(username) {
     if (dt.website) discovered.push({ type: 'url',      value: dt.website, source: 'Dev.to website' });
   }
 
+  const enc = encodeURIComponent(username);
   const manual_checks = [
-    { name: 'Instagram',   url: `https://www.instagram.com/${username}/` },
-    { name: 'TikTok',      url: `https://www.tiktok.com/@${username}` },
-    { name: 'Snapchat',    url: `https://www.snapchat.com/add/${username}` },
-    { name: 'Twitter / X', url: `https://x.com/${username}` },
-    { name: 'Facebook',    url: `https://www.facebook.com/${username}` },
-    { name: 'LinkedIn',    url: `https://www.linkedin.com/in/${username}` },
-    { name: 'YouTube',     url: `https://www.youtube.com/@${username}` },
-    { name: 'Twitch',      url: `https://www.twitch.tv/${username}` },
-    { name: 'Discord',     url: `https://discord.com/users/${username}` },
-    { name: 'Pinterest',   url: `https://www.pinterest.com/${username}/` },
-    { name: 'SoundCloud',  url: `https://soundcloud.com/${username}` },
-    { name: 'Kik',         url: `https://ws2.kik.com/user/${username}` },
-    { name: 'Spotify',     url: `https://open.spotify.com/user/${username}` },
-    { name: 'VSCO',        url: `https://vsco.co/${username}/gallery` },
+    // Social — login-walled, check by eye
+    { name: 'Instagram',       category: 'Social',        url: `https://www.instagram.com/${username}/` },
+    { name: 'TikTok',          category: 'Social',        url: `https://www.tiktok.com/@${username}` },
+    { name: 'Snapchat',        category: 'Social',        url: `https://www.snapchat.com/add/${username}` },
+    { name: 'Twitter / X',     category: 'Social',        url: `https://x.com/${username}` },
+    { name: 'Facebook',        category: 'Social',        url: `https://www.facebook.com/${username}` },
+    { name: 'Pinterest',       category: 'Social',        url: `https://www.pinterest.com/${username}/` },
+    { name: 'VSCO',            category: 'Social',        url: `https://vsco.co/${username}/gallery` },
+    { name: 'BeReal',          category: 'Social',        url: `https://bere.al/${username}` },
+    // Gaming
+    { name: 'Xbox Gamertag',   category: 'Gaming',        url: `https://xboxgamertag.com/search/${enc}` },
+    { name: 'PlayStation (PSN)',category: 'Gaming',        url: `https://my.playstation.com/profile/${username}` },
+    { name: 'Fortnite Tracker',category: 'Gaming',        url: `https://fortnitetracker.com/profile/all/${enc}` },
+    { name: 'Minecraft NameMC',category: 'Gaming',        url: `https://namemc.com/search?q=${enc}` },
+    { name: 'Discord',         category: 'Gaming',        url: `https://discord.com/users/${username}` },
+    // Video / Streaming
+    { name: 'YouTube',         category: 'Video',         url: `https://www.youtube.com/@${username}` },
+    { name: 'Twitch',          category: 'Video',         url: `https://www.twitch.tv/${username}` },
+    // Community / Teen
+    { name: 'Ask.fm',          category: 'Community',     url: `https://ask.fm/${username}` },
+    { name: 'Wattpad',         category: 'Community',     url: `https://www.wattpad.com/user/${username}` },
+    { name: 'Amino',           category: 'Community',     url: `https://aminoapps.com/u/${username}` },
+    // Messaging
+    { name: 'Kik',             category: 'Messaging',     url: `https://ws2.kik.com/user/${username}` },
+    // Music
+    { name: 'SoundCloud',      category: 'Music',         url: `https://soundcloud.com/${username}` },
+    { name: 'Spotify',         category: 'Music',         url: `https://open.spotify.com/user/${username}` },
+    // Professional / Writing
+    { name: 'LinkedIn',        category: 'Professional',  url: `https://www.linkedin.com/in/${username}` },
+    { name: 'Medium',          category: 'Writing',       url: `https://medium.com/@${username}` },
+    // Other
+    { name: 'OnlyFans',        category: 'Content',       url: `https://onlyfans.com/${username}` },
   ];
 
   return {
@@ -482,6 +504,62 @@ async function enrichDevTo(username) {
     avatar_url: d.profile_image || null,
     joined: d.joined_at || null,
     profile_url: `https://dev.to/${d.username}`,
+  };
+}
+
+// ── Minecraft ─────────────────────────────────────────────────
+async function enrichMinecraft(username) {
+  const r = await get(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(username)}`);
+  if (r.status === 404 || r.status === 204 || !r.data?.id) return { found: false };
+  if (r.status !== 200) return { found: false };
+  const uuid = r.data.id;
+  return {
+    found: true,
+    name: r.data.name,
+    uuid,
+    avatar_url: `https://crafatar.com/avatars/${uuid}?size=70&overlay=true`,
+    profile_url: `https://namemc.com/profile/${r.data.name}`,
+  };
+}
+
+// ── Scratch ───────────────────────────────────────────────────
+async function enrichScratch(username) {
+  const r = await get(`https://api.scratch.mit.edu/users/${encodeURIComponent(username)}/`);
+  if (r.status === 404 || !r.data?.username) return { found: false };
+  if (r.status !== 200) return { found: false };
+  const d = r.data;
+  return {
+    found: true,
+    username: d.username,
+    bio: d.profile?.bio || null,
+    about: d.profile?.status || null,
+    country: d.profile?.country || null,
+    created_at: d.history?.joined || null,
+    account_age_days: d.history?.joined ? Math.floor((Date.now() - new Date(d.history.joined).getTime()) / 86400000) : null,
+    avatar_url: d.profile?.images?.['90x90'] || null,
+    profile_url: `https://scratch.mit.edu/users/${d.username}/`,
+  };
+}
+
+// ── Twitch ────────────────────────────────────────────────────
+async function enrichTwitch(username) {
+  const r = await post(
+    'https://gql.twitch.tv/gql',
+    [{ query: `{user(login:"${username.toLowerCase()}"){id,login,displayName,description,createdAt,followers{totalCount},profileImageURL(width:70)}}` }],
+    { headers: { 'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko', 'User-Agent': UA } }
+  );
+  if (r.status !== 200 || !r.data?.[0]?.data?.user) return { found: false };
+  const d = r.data[0].data.user;
+  if (!d) return { found: false };
+  return {
+    found: true,
+    name: d.displayName,
+    bio: d.description || null,
+    followers: d.followers?.totalCount ?? null,
+    created_at: d.createdAt || null,
+    account_age_days: d.createdAt ? Math.floor((Date.now() - new Date(d.createdAt).getTime()) / 86400000) : null,
+    avatar_url: d.profileImageURL || null,
+    profile_url: `https://www.twitch.tv/${d.login}`,
   };
 }
 

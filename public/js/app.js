@@ -258,6 +258,8 @@ function renderPlatformCard(platName, username, d, source) {
   add('Posts',        d.submission_count !== undefined ? d.submission_count.toLocaleString() : null);
   add('Friends',      d.friend_count !== undefined && d.friend_count !== null ? d.friend_count.toLocaleString() : null);
   add('Steam display',d.persona_name);
+  add('Minecraft UUID', d.uuid);
+  add('Twitch followers', d.followers !== undefined && d.followers !== null ? d.followers.toLocaleString() : null);
   add('VAC banned',   d.vac_bans ? '⚠️ YES' : null);
   add('Banned',       d.is_banned ? '⚠️ YES' : null);
   add('Visibility',   d.visibility === 'Private' ? '\u{1F512} Private profile' : null);
@@ -402,22 +404,56 @@ function renderSeedDetail(r) {
 }
 
 function renderOsintLinks(links, query, type) {
+  const withUrl = links.filter((l) => l.url);
+  const allUrlsJson = JSON.stringify(withUrl.map((l) => l.url));
+
+  // Group by category if present
+  const groups = {};
+  for (const l of links) {
+    const cat = l.category || 'Other';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(l);
+  }
+  const hasCategories = Object.keys(groups).length > 1;
+
+  let inner = '';
+  if (hasCategories) {
+    for (const [cat, items] of Object.entries(groups)) {
+      inner += `<div class="oli-group">
+        <div class="oli-group-label">${esc(cat)}</div>
+        <div class="oli-group-items">
+          ${items.map((l) => renderOsintLinkItem(l)).join('')}
+        </div>
+      </div>`;
+    }
+  } else {
+    inner = links.map((l) => renderOsintLinkItem(l)).join('');
+  }
+
   return `
     <div style="margin-top:1rem">
-      <div style="margin-bottom:0.75rem;font-size:0.85rem;color:var(--text-muted)">
-        Open each link and check manually &mdash; results are not auto-scraped.
+      <div class="osint-links-header">
+        <span style="font-size:0.85rem;color:var(--text-muted)">Check each one manually &mdash; these open in a new tab.</span>
+        ${withUrl.length > 1 ? `<button class="btn-open-all" onclick='openAllLinks(${allUrlsJson})'>Open All ${withUrl.length} Tabs ↗</button>` : ''}
       </div>
-      <div class="osint-link-list">
-        ${links.map((l) => `
-          <div class="osint-link-item">
-            <div class="oli-name">${esc(l.name)}</div>
-            <div class="oli-desc">${esc(l.description)}</div>
-            ${l.url
-              ? `<a class="oli-link" href="${esc(l.url)}" target="_blank" rel="noreferrer noopener">Open ↗</a>`
-              : `<span class="oli-link muted">run locally</span>`}
-          </div>`).join('')}
+      <div class="osint-link-list ${hasCategories ? 'has-categories' : ''}">
+        ${inner}
       </div>
     </div>`;
+}
+
+function renderOsintLinkItem(l) {
+  return `<div class="osint-link-item">
+    <div class="oli-name">${esc(l.name)}</div>
+    ${l.description ? `<div class="oli-desc">${esc(l.description)}</div>` : ''}
+    ${l.url
+      ? `<a class="oli-link" href="${esc(l.url)}" target="_blank" rel="noreferrer noopener">Open ↗</a>`
+      : `<span class="oli-link muted">run locally</span>`}
+  </div>`;
+}
+
+function openAllLinks(urls) {
+  for (const url of urls) window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 // ============================================================

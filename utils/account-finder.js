@@ -167,6 +167,116 @@ const SITES = [
       return UNKNOWN;
     },
   },
+  {
+    name: 'Duolingo', category: 'Education',
+    ref: 'https://www.duolingo.com/',
+    check: async (email) => {
+      const r = await req({
+        method: 'post',
+        url: 'https://www.duolingo.com/login',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', Referer: 'https://www.duolingo.com/' },
+        data: `login=${encodeURIComponent(email)}&password=WRONGPASSWORD_CHECK_ONLY`,
+        maxRedirects: 0,
+      });
+      if (r.status === 200) {
+        const body = JSON.stringify(r.data || '');
+        // Duolingo says "incorrect password" for real accounts, "user not found" for missing ones
+        if (/incorrect.password|wrong.password/i.test(body)) return REGISTERED;
+        if (/user.not.found|doesn.t.exist|no.account/i.test(body)) return NOT_REGISTERED;
+      }
+      return UNKNOWN;
+    },
+  },
+  {
+    name: 'Roblox', category: 'Gaming',
+    ref: 'https://www.roblox.com/',
+    check: async (email) => {
+      // Roblox password reset: returns a success message regardless of whether the email exists
+      // but the wording differs between existing and non-existing accounts
+      const r = await req({
+        method: 'post',
+        url: 'https://auth.roblox.com/v2/passwords/reset/send',
+        headers: { 'Content-Type': 'application/json', Referer: 'https://www.roblox.com/' },
+        data: JSON.stringify({ targetType: 0, target: email }),
+      });
+      if (r.status === 200) return REGISTERED;
+      if (r.status === 400) {
+        const body = JSON.stringify(r.data || '');
+        if (/invalid|not.found|no.account/i.test(body)) return NOT_REGISTERED;
+        return UNKNOWN;
+      }
+      return UNKNOWN;
+    },
+  },
+  {
+    name: 'Snapchat', category: 'Social',
+    ref: 'https://www.snapchat.com/',
+    check: async (email) => {
+      // Snapchat's public forgot-password endpoint hints at whether email is registered
+      const r = await req({
+        method: 'post',
+        url: 'https://accounts.snapchat.com/accounts/password_reset_email',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        data: `email=${encodeURIComponent(email)}&xsrf_nonce=&referrer=`,
+      });
+      if (r.status === 200) {
+        const body = JSON.stringify(r.data || '');
+        if (/sent|check.your.email|reset/i.test(body)) return REGISTERED;
+        if (/not.found|no.account|invalid.email/i.test(body)) return NOT_REGISTERED;
+      }
+      return UNKNOWN;
+    },
+  },
+  {
+    name: 'Patreon', category: 'Content',
+    ref: 'https://www.patreon.com/',
+    check: async (email) => {
+      const r = await req({
+        url: `https://www.patreon.com/api/auth/exists?email=${encodeURIComponent(email)}`,
+        headers: { Referer: 'https://www.patreon.com/login' },
+      });
+      if (r.status === 200 && r.data && typeof r.data.exists === 'boolean') {
+        return r.data.exists ? REGISTERED : NOT_REGISTERED;
+      }
+      return UNKNOWN;
+    },
+  },
+  {
+    name: 'Xbox / Microsoft', category: 'Gaming',
+    ref: 'https://account.xbox.com/',
+    check: async (email) => {
+      const r = await req({
+        url: `https://login.live.com/GetCredentialType.srf`,
+        method: 'post',
+        headers: { 'Content-Type': 'application/json' },
+        data: JSON.stringify({ username: email, isOtherIdpSupported: true, checkPhones: false, isRemoteNGCSupported: false, isCookieBannerShown: false, isFidoSupported: false, originalRequest: '' }),
+      });
+      if (r.status === 200 && r.data) {
+        const code = r.data.IfExistsResult;
+        if (code === 0 || code === 6) return REGISTERED;
+        if (code === 1) return NOT_REGISTERED;
+      }
+      return UNKNOWN;
+    },
+  },
+  {
+    name: 'Twitch', category: 'Streaming',
+    ref: 'https://www.twitch.tv/',
+    check: async (email) => {
+      const r = await req({
+        url: `https://passport.twitch.tv/register/check_user`,
+        method: 'post',
+        headers: { 'Content-Type': 'application/json', 'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko' },
+        data: JSON.stringify({ email }),
+      });
+      if (r.status === 200 && r.data) {
+        const body = JSON.stringify(r.data);
+        if (/email.*taken|already.*registered/i.test(body)) return REGISTERED;
+        if (/available/i.test(body)) return NOT_REGISTERED;
+      }
+      return UNKNOWN;
+    },
+  },
 ];
 
 // Run all site checks concurrently (pool) and return structured results.

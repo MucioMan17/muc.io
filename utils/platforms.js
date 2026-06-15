@@ -222,27 +222,80 @@ const RELIABLE = [
       return UNKNOWN;
     },
   },
+  {
+    name: 'Minecraft',
+    url: (u) => `https://namemc.com/profile/${u}`,
+    check: async (u) => {
+      const r = await axios.get(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(u)}`, {
+        headers: { 'User-Agent': UA }, validateStatus: null,
+      });
+      if (r.status === 200 && r.data?.id) return FOUND;
+      if (r.status === 404 || r.status === 204) return NOT_FOUND;
+      return UNKNOWN;
+    },
+  },
+  {
+    name: 'Scratch',
+    url: (u) => `https://scratch.mit.edu/users/${u}/`,
+    check: async (u) => {
+      const r = await axios.get(`https://api.scratch.mit.edu/users/${encodeURIComponent(u)}/`, {
+        headers: { 'User-Agent': UA }, validateStatus: null,
+      });
+      if (r.status === 200 && r.data?.username) return FOUND;
+      if (r.status === 404) return NOT_FOUND;
+      return UNKNOWN;
+    },
+  },
+  {
+    name: 'Twitch',
+    url: (u) => `https://www.twitch.tv/${u}`,
+    check: async (u) => {
+      const r = await axios.post(
+        'https://gql.twitch.tv/gql',
+        [{ query: `{user(login:"${u.toLowerCase()}"){id,login}}` }],
+        { headers: { 'Client-Id': 'kimne78kx3ncx6brgo4mv6wki5h1ko', 'User-Agent': UA, 'Content-Type': 'application/json' }, validateStatus: null }
+      );
+      if (r.status === 200 && r.data?.[0]?.data?.user?.id) return FOUND;
+      if (r.status === 200 && r.data?.[0]?.data?.user === null) return NOT_FOUND;
+      return UNKNOWN;
+    },
+  },
 ];
 
 // ---- Manual-verification platforms (URL only, never auto-confirmed) ----
 // Login walls / aggressive anti-bot make automated checks unreliable.
 const MANUAL = [
-  { name: 'Instagram', url: (u) => `https://www.instagram.com/${u}/` },
-  { name: 'Facebook', url: (u) => `https://www.facebook.com/${u}` },
-  { name: 'X / Twitter', url: (u) => `https://x.com/${u}` },
-  { name: 'TikTok', url: (u) => `https://www.tiktok.com/@${u}` },
-  { name: 'Snapchat', url: (u) => `https://www.snapchat.com/add/${u}` },
-  { name: 'LinkedIn', url: (u) => `https://www.linkedin.com/in/${u}` },
-  { name: 'YouTube', url: (u) => `https://www.youtube.com/@${u}` },
-  { name: 'Twitch', url: (u) => `https://www.twitch.tv/${u}` },
-  { name: 'Pinterest', url: (u) => `https://www.pinterest.com/${u}/` },
-  { name: 'SoundCloud', url: (u) => `https://soundcloud.com/${u}` },
-  { name: 'Spotify', url: (u) => `https://open.spotify.com/user/${u}` },
-  { name: 'Medium', url: (u) => `https://medium.com/@${u}` },
-  { name: 'Discord (invite)', url: (u) => `https://discord.com/invite/${u}` },
-  { name: 'Kik', url: (u) => `https://ws2.kik.com/user/${u}` },
-  { name: 'OnlyFans', url: (u) => `https://onlyfans.com/${u}` },
-  { name: 'VSCO', url: (u) => `https://vsco.co/${u}/gallery` },
+  // Social
+  { name: 'Instagram',         url: (u) => `https://www.instagram.com/${u}/` },
+  { name: 'Facebook',          url: (u) => `https://www.facebook.com/${u}` },
+  { name: 'X / Twitter',       url: (u) => `https://x.com/${u}` },
+  { name: 'TikTok',            url: (u) => `https://www.tiktok.com/@${u}` },
+  { name: 'Snapchat',          url: (u) => `https://www.snapchat.com/add/${u}` },
+  { name: 'Pinterest',         url: (u) => `https://www.pinterest.com/${u}/` },
+  { name: 'VSCO',              url: (u) => `https://vsco.co/${u}/gallery` },
+  { name: 'BeReal',            url: (u) => `https://bere.al/${u}` },
+  // Gaming
+  { name: 'Xbox Gamertag',     url: (u) => `https://xboxgamertag.com/search/${encodeURIComponent(u)}` },
+  { name: 'PlayStation (PSN)', url: (u) => `https://my.playstation.com/profile/${u}` },
+  { name: 'Fortnite Tracker',  url: (u) => `https://fortnitetracker.com/profile/all/${encodeURIComponent(u)}` },
+  // Video
+  { name: 'YouTube',           url: (u) => `https://www.youtube.com/@${u}` },
+  { name: 'Twitch',            url: (u) => `https://www.twitch.tv/${u}` },
+  // Community / Teen
+  { name: 'Ask.fm',            url: (u) => `https://ask.fm/${u}` },
+  { name: 'Wattpad',           url: (u) => `https://www.wattpad.com/user/${u}` },
+  { name: 'Amino',             url: (u) => `https://aminoapps.com/u/${u}` },
+  // Messaging
+  { name: 'Kik',               url: (u) => `https://ws2.kik.com/user/${u}` },
+  { name: 'Discord',           url: (u) => `https://discord.com/users/${u}` },
+  // Music
+  { name: 'SoundCloud',        url: (u) => `https://soundcloud.com/${u}` },
+  { name: 'Spotify',           url: (u) => `https://open.spotify.com/user/${u}` },
+  // Professional
+  { name: 'LinkedIn',          url: (u) => `https://www.linkedin.com/in/${u}` },
+  { name: 'Medium',            url: (u) => `https://medium.com/@${u}` },
+  // Content
+  { name: 'OnlyFans',          url: (u) => `https://onlyfans.com/${u}` },
 ];
 
 async function checkReliable(platform, username) {
