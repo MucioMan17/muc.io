@@ -13,6 +13,8 @@
 
 const axios  = require('axios');
 const crypto = require('crypto');
+const { findAccountsByEmail } = require('./account-finder');
+const { runHolehe, runSherlock } = require('./external-tools');
 
 const UA      = 'Mozilla/5.0 (compatible; research-tool/1.0)';
 const TIMEOUT = 10000;
@@ -80,10 +82,12 @@ async function enrichEmail(email) {
   const hash = crypto.createHash('md5').update(norm).digest('hex');
   const isFreemail = /^(gmail|yahoo|hotmail|outlook|icloud|proton|protonmail|live|msn|aol|me|mac|googlemail|ymail|gmx|tutanota|fastmail)\./.test(domain);
 
-  const [gravatar, githubMatch, keybaseMatch] = await Promise.all([
+  const [gravatar, githubMatch, keybaseMatch, accountFinder, holehe] = await Promise.all([
     checkGravatar(norm, hash),
     searchGitHubByEmail(norm),
     searchKeybaseByEmail(norm),
+    safe(() => findAccountsByEmail(norm)),
+    safe(() => runHolehe(norm)),
   ]);
 
   const discovered = [];
@@ -112,6 +116,8 @@ async function enrichEmail(email) {
       gravatar,
       github_match: githubMatch,
       keybase_match: keybaseMatch,
+      account_finder: accountFinder && !accountFinder.error ? accountFinder : null,
+      holehe: holehe && holehe.available ? holehe : null,
       username_candidates: usernameCandidates,
       manual_checks: [
         { name: 'Have I Been Pwned', description: 'Check data breach history', url: `https://haveibeenpwned.com/account/${encodeURIComponent(norm)}` },
@@ -184,7 +190,10 @@ async function enrichUsername(username) {
     { name: 'Codeforces', fn: () => enrichCodeforces(username) },
   ];
 
-  const checks = await pool(platforms, ({ fn }) => safe(fn), 5);
+  const [checks, sherlock] = await Promise.all([
+    pool(platforms, ({ fn }) => safe(fn), 5),
+    safe(() => runSherlock(username)),
+  ]);
   const byName = {};
   platforms.forEach(({ name }, i) => { byName[name] = checks[i]; });
 
@@ -228,7 +237,16 @@ async function enrichUsername(username) {
     { name: 'VSCO',        url: `https://vsco.co/${username}/gallery` },
   ];
 
-  return { type: 'username', value: username, data: { platforms: byName, manual_checks }, discovered };
+  return {
+    type: 'username',
+    value: username,
+    data: {
+      platforms: byName,
+      sherlock: sherlock && sherlock.available ? sherlock : null,
+      manual_checks,
+    },
+    discovered,
+  };
 }
 
 // ── GitHub ────────────────────────────────────────────────────

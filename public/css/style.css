@@ -499,6 +499,17 @@ input[type="file"] {
 .rev-img-links a { font-size: 0.72rem; color: var(--accent); text-decoration: none; background: rgba(79,125,255,0.1); padding: 0.15rem 0.45rem; border-radius: 99px; }
 .rev-img-links a:hover { background: rgba(79,125,255,0.2); }
 
+/* ===== Account finder (email registration checks) ===== */
+.account-finder {
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.85rem 1rem; margin-bottom: 0.85rem;
+}
+.af-hits-title { font-size: 0.85rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; }
+.af-none { font-size: 0.82rem; color: var(--text-muted); }
+.af-stats { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.5rem; }
+.af-tip { font-size: 0.74rem; color: var(--text-muted); margin-top: 0.4rem; }
+.af-tip code { background: var(--bg); padding: 0.1rem 0.35rem; border-radius: 4px; color: var(--accent); }
+
 /* ===== Toast notification ===== */
 .toast {
   position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(20px);

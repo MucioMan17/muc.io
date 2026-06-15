@@ -771,6 +771,26 @@ function renderInvestigateResults(data) {
     html += `<div class="platform-data-grid">${platformCards.join('')}</div>`;
   }
 
+  // ── Sherlock results (username → 400+ sites, if installed) ─────────
+  const sherlockHits = [];
+  let sherlockRan = false;
+  for (const r of allResultsForData) {
+    if (r.type === 'username' && r.data?.sherlock) {
+      sherlockRan = true;
+      for (const acc of r.data.sherlock.accounts || []) {
+        sherlockHits.push({ ...acc, username: r.value });
+      }
+    }
+  }
+  if (sherlockRan && sherlockHits.length) {
+    html += '<h3 style="margin:1.5rem 0 0.75rem;font-size:1rem">Sherlock — Found Across the Web</h3>';
+    html += `<div class="platform-list">${sherlockHits.map((h) => `
+      <a href="${esc(h.url)}" target="_blank" rel="noreferrer noopener" class="platform-hit">
+        <span class="ph-name">${esc(h.site)}</span>
+        <span class="ph-user">@${esc(h.username)}</span>
+      </a>`).join('')}</div>`;
+  }
+
   return html;
 }
 
@@ -875,10 +895,53 @@ function renderDiscordCard(r) {
   </div>`;
 }
 
+function renderAccountFinder(r) {
+  if (r.type !== 'email') return '';
+  const af = r.data?.account_finder;
+  const holehe = r.data?.holehe;
+
+  // Merge built-in registered hits + holehe hits into one confirmed list.
+  const confirmed = [];
+  if (af && af.registered) {
+    for (const s of af.registered) confirmed.push({ name: s.name, ref: s.ref, src: 'built-in' });
+  }
+  if (holehe && holehe.sites) {
+    for (const domain of holehe.sites) confirmed.push({ name: domain, ref: `https://${domain}`, src: 'holehe' });
+  }
+
+  if (!confirmed.length && !(af && af.checked)) return '';
+
+  let html = '<div class="account-finder">';
+  html += `<div class="ps-label">Automated Account Check${holehe ? ' + holehe' : ''}</div>`;
+
+  if (confirmed.length) {
+    html += `<div class="af-hits">
+      <div class="af-hits-title">✓ Email is registered on ${confirmed.length} site${confirmed.length > 1 ? 's' : ''}:</div>
+      <div class="platform-list">
+        ${confirmed.map((c) => `<a href="${esc(c.ref)}" target="_blank" rel="noreferrer noopener" class="platform-hit">
+          <span class="ph-name">${esc(c.name)}</span>${c.src === 'holehe' ? '<span class="ph-user">holehe</span>' : ''}
+        </a>`).join('')}
+      </div>
+    </div>`;
+  } else {
+    html += '<div class="af-none">No confirmed registrations from automated checks. (Sites may be rate-limiting — confirm manually below.)</div>';
+  }
+
+  if (af && af.checked) {
+    const reg = af.registered.length, no = af.not_registered.length, unk = af.unknown.length;
+    html += `<div class="af-stats">${reg} found · ${no} not registered · ${unk} blocked/unknown (of ${af.checked} checked)</div>`;
+  }
+  if (!holehe) {
+    html += '<div class="af-tip">💡 Install <code>holehe</code> for 120+ site coverage (auto-detected when present).</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function renderSeedDetail(r) {
   const manualChecks = r.data?.manual_checks || [];
   const source = r._source ? ` <span style="font-size:0.75rem;color:var(--text-muted)">← ${esc(r._source)}</span>` : '';
-  let extra = '';
+  let extra = renderAccountFinder(r);
 
   if (r.type === 'email' && r.data?.gravatar?.found) {
     const g = r.data.gravatar;
