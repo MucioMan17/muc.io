@@ -3,6 +3,9 @@ setlocal EnableDelayedExpansion
 title muc.io — Update and Launch
 color 0A
 
+:: This wrapper ensures the window NEVER closes automatically —
+:: every exit path ends at the final pause so you can always read errors.
+
 echo.
 echo  ================================================
 echo    muc.io  ^|  Investigation Toolkit
@@ -11,26 +14,34 @@ echo.
 
 REM Always run from this script's own directory
 cd /d "%~dp0"
+echo  Working folder: %CD%
+echo.
 
 REM ── Prerequisite checks ──────────────────────────────────────────────────
 
-git --version >nul 2>&1
+echo  Checking for Git...
+git --version 2>&1
 if errorlevel 1 (
-    echo  [!]  Git is not installed.
-    echo       Download from: https://git-scm.com/
     echo.
-    pause
-    exit /b 1
+    echo  [ERROR] Git is not installed.
+    echo  Download from: https://git-scm.com/
+    echo.
+    goto :DONE
 )
 
-node --version >nul 2>&1
+echo.
+echo  Checking for Node.js...
+node --version 2>&1
 if errorlevel 1 (
-    echo  [!]  Node.js is not installed.
-    echo       Download from: https://nodejs.org/
     echo.
-    pause
-    exit /b 1
+    echo  [ERROR] Node.js is not installed.
+    echo  Download from: https://nodejs.org/
+    echo.
+    goto :DONE
 )
+
+echo.
+echo  ────────────────────────────────────────────────
 
 REM ── Pull latest updates ──────────────────────────────────────────────────
 
@@ -39,46 +50,53 @@ echo.
 git pull origin claude/predator-investigation-support-xd2lk6 2>&1
 if errorlevel 1 (
     echo.
-    echo  [~]  Could not pull updates ^(offline or up to date^).
-    echo       Starting with local files.
+    echo  [~] Could not pull updates. Starting with local files.
 )
 
 echo.
+echo  ────────────────────────────────────────────────
 
 REM ── Install / update dependencies ────────────────────────────────────────
 
-echo  [2/3]  Checking dependencies...
+echo  [2/3]  Installing dependencies...
 echo.
-npm install --prefer-offline 2>&1
+npm install 2>&1
 if errorlevel 1 (
     echo.
-    echo  [!]  npm install failed. See error above.
-    pause
-    exit /b 1
+    echo  [ERROR] npm install failed. See error above.
+    echo.
+    goto :DONE
 )
 
 echo.
+echo  ────────────────────────────────────────────────
 
 REM ── Launch ───────────────────────────────────────────────────────────────
 
-echo  [3/3]  Starting muc.io...
+echo  [3/3]  Starting server...
 echo.
 echo  ┌─────────────────────────────────────────────┐
 echo  │                                             │
-echo  │   Open in browser:  http://localhost:3000   │
+echo  │   Browser opening: http://localhost:3000    │
 echo  │                                             │
-echo  │   Close this window to stop the server.     │
+echo  │   Keep this window open while you work.     │
+echo  │   Close it when you are done.               │
 echo  │                                             │
 echo  └─────────────────────────────────────────────┘
 echo.
 
-REM Open browser after a 2-second delay (runs in background so it doesn't
-REM block the server window, which stays open and shows live logs).
-start /min cmd /c "timeout /t 2 /nobreak >nul && start http://localhost:3000"
+REM Open browser after 3 seconds (runs in background)
+start /min cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:3000"
 
-npm start
+REM Start the server — this line blocks until the server stops
+npm start 2>&1
 
-REM If the server exits on its own, pause so the user can read any error.
 echo.
-echo  Server stopped.
-pause
+echo  ────────────────────────────────────────────────
+echo  Server stopped. If you saw an error above,
+echo  take a screenshot and send it for help.
+echo.
+
+:DONE
+echo  Press any key to close this window...
+pause >nul
