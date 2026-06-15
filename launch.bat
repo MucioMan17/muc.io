@@ -1,9 +1,9 @@
 @echo off
 setlocal EnableDelayedExpansion
-title muc.io — Update and Launch
+title muc.io - Update and Launch
 color 0A
 
-:: This wrapper ensures the window NEVER closes automatically —
+:: This wrapper ensures the window NEVER closes automatically --
 :: every exit path ends at the final pause so you can always read errors.
 
 echo.
@@ -17,7 +17,7 @@ cd /d "%~dp0"
 echo  Working folder: %CD%
 echo.
 
-REM ── Prerequisite checks ──────────────────────────────────────────────────
+REM -- Prerequisite checks --
 
 echo  Checking for Git...
 git --version 2>&1
@@ -41,9 +41,9 @@ if errorlevel 1 (
 )
 
 echo.
-echo  ────────────────────────────────────────────────
+echo  ------------------------------------------------
 
-REM ── Pull latest updates ──────────────────────────────────────────────────
+REM -- Pull latest updates --
 
 echo  [1/3]  Pulling latest updates...
 echo.
@@ -54,9 +54,9 @@ if errorlevel 1 (
 )
 
 echo.
-echo  ────────────────────────────────────────────────
+echo  ------------------------------------------------
 
-REM ── Install / update dependencies ────────────────────────────────────────
+REM -- Install / update dependencies --
 
 echo  [2/3]  Installing dependencies...
 echo.
@@ -69,30 +69,30 @@ if errorlevel 1 (
 )
 
 echo.
-echo  ────────────────────────────────────────────────
+echo  ------------------------------------------------
 
-REM ── Launch ───────────────────────────────────────────────────────────────
+REM -- Launch --
 
 echo  [3/3]  Starting server...
 echo.
-echo  ┌─────────────────────────────────────────────┐
-echo  │                                             │
-echo  │   Browser opening: http://localhost:3000    │
-echo  │                                             │
-echo  │   Keep this window open while you work.     │
-echo  │   Close it when you are done.               │
-echo  │                                             │
-echo  └─────────────────────────────────────────────┘
+echo  +---------------------------------------------+
+echo  ^|                                             ^|
+echo  ^|   Browser opening: http://localhost:3000    ^|
+echo  ^|                                             ^|
+echo  ^|   Keep this window open while you work.     ^|
+echo  ^|   Close it when you are done.               ^|
+echo  ^|                                             ^|
+echo  +---------------------------------------------+
 echo.
 
 REM Open browser after 3 seconds (runs in background)
 start /min cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:3000"
 
-REM Start the server — this line blocks until the server stops
+REM Start the server -- this line blocks until the server stops
 npm start 2>&1
 
 echo.
-echo  ────────────────────────────────────────────────
+echo  ------------------------------------------------
 echo  Server stopped. If you saw an error above,
 echo  take a screenshot and send it for help.
 echo.
