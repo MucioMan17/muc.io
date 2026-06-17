@@ -14,6 +14,7 @@ let lastResult = null;                         // most recent investigation (for
 function detectType(raw) {
   const v = raw.trim();
   if (/^\S+@\S+\.\S+$/.test(v)) return 'email';
+  if (/discord\.gg\//i.test(v) || /discord\.com\/invite\//i.test(v)) return 'discord'; // invite URL
   if (/^\d{17,20}$/.test(v)) return 'discord';            // Discord snowflake ID
   if (/^.+#\d{4}$/.test(v)) return 'discord';             // legacy name#1234
   const digits = v.replace(/\D/g, '');
@@ -203,7 +204,7 @@ function renderInvestigateResults(data) {
         if (d.found) platformCards.push(renderPlatformCard(platName, r.value, d, r._source));
       }
     }
-    if (r.type === 'discord' && r.data?.id) platformCards.push(renderDiscordCard(r));
+    if (r.type === 'discord') platformCards.push(renderDiscordCard(r));
   }
   if (platformCards.length) {
     html += '<h3 class="results-heading">Extracted Data</h3>';
@@ -305,32 +306,107 @@ function renderPlatformCard(platName, username, d, source) {
 
 function renderDiscordCard(r) {
   const d = r.data;
+  if (!d) return '';
+
+  // ── Server invite result ───────────────────────────────────
+  if (d.kind === 'server_invite') {
+    const iconHtml = d.server_icon_url
+      ? `<img src="${esc(d.server_icon_url)}" alt="" class="pdc-avatar" onerror="this.style.display='none'" />`
+      : `<div class="pdc-avatar-placeholder">&#x1F4AC;</div>`;
+    const rows = [];
+    if (d.server_name)        rows.push(['Server name',   d.server_name]);
+    if (d.server_id)          rows.push(['Server ID',     d.server_id]);
+    if (d.server_description) rows.push(['Description',   d.server_description]);
+    if (d.member_count)       rows.push(['Members',       d.member_count.toLocaleString()]);
+    if (d.online_count)       rows.push(['Online now',    d.online_count.toLocaleString()]);
+    if (d.channel_name)       rows.push(['Invite channel',d.channel_name]);
+    if (d.invite_code)        rows.push(['Invite code',   d.invite_code]);
+
+    let inviterSection = '';
+    if (d.inviter_id) {
+      const invAv = d.inviter_avatar_url
+        ? `<img src="${esc(d.inviter_avatar_url)}" alt="" class="discord-inviter-av" onerror="this.style.display='none'" />`
+        : '';
+      inviterSection = `<div class="discord-inviter">
+        <div class="discord-inviter-label">&#x26A0;&#xFE0F; Invite was created by this user — their Discord ID has been added to the investigation:</div>
+        <div class="discord-inviter-row">
+          ${invAv}
+          <div>
+            <div class="discord-inviter-name">${esc(d.inviter_username || 'Unknown')}</div>
+            <div class="discord-inviter-id">ID: ${esc(d.inviter_id)}</div>
+            <a href="https://discord.com/users/${esc(d.inviter_id)}" target="_blank" rel="noreferrer noopener" class="pdc-link">View their Discord profile ↗</a>
+          </div>
+        </div>
+      </div>`;
+    } else {
+      inviterSection = `<div class="discord-inviter-label" style="color:var(--text-muted);font-size:0.8rem;margin-top:0.5rem">No inviter recorded — this may be a server-generated permanent invite.</div>`;
+    }
+
+    return `<div class="platform-data-card discord-invite-card">
+      <div class="pdc-header">
+        ${iconHtml}
+        <div style="flex:1;min-width:0">
+          <div class="pdc-name">Discord Server Invite</div>
+          <div class="pdc-user">discord.gg/${esc(d.invite_code || r.value)}</div>
+          <a href="https://discord.gg/${esc(d.invite_code || r.value)}" target="_blank" rel="noreferrer noopener" class="pdc-link">Open Invite ↗</a>
+        </div>
+      </div>
+      ${d.error ? `<div style="color:var(--danger);font-size:0.82rem;margin-top:0.5rem">${esc(d.error)}</div>` : ''}
+      ${rows.length ? `<table class="pdc-table">${rows.map(([k, v]) => `<tr><td class="pdc-key">${esc(k)}</td><td class="pdc-val">${esc(v)}</td></tr>`).join('')}</table>` : ''}
+      ${inviterSection}
+    </div>`;
+  }
+
+  // ── User ID result ─────────────────────────────────────────
   const rows = [];
-  if (d.global_name)  rows.push(['Display name', d.global_name]);
-  if (d.username)     rows.push(['Username', d.username]);
-  if (d.created_at)   rows.push(['Account created', new Date(d.created_at).toLocaleDateString()]);
-  if (d.badges?.length) rows.push(['Badges', d.badges.join(', ')]);
+  if (d.global_name || d.display_name) rows.push(['Display name', d.global_name || d.display_name]);
+  if (d.username)        rows.push(['Username',       d.username]);
+  if (d.id)              rows.push(['User ID',        d.id]);
+  if (d.created_at)      rows.push(['Account created', new Date(d.created_at).toLocaleDateString()]);
+  if (d.account_age_days !== undefined && d.account_age_days !== null)
+                         rows.push(['Account age',    `${d.account_age_days.toLocaleString()} days`]);
+  if (d.badges?.length)  rows.push(['Badges',         d.badges.join(', ')]);
 
   const avatarHtml = d.avatar_url
     ? `<img src="${esc(d.avatar_url)}" alt="" class="pdc-avatar" onerror="this.style.display='none'" />`
-    : '';
+    : `<div class="pdc-avatar-placeholder">&#x1F4AC;</div>`;
+
   const revImgHtml = d.avatar_url ? `<div class="rev-img-links">
-    <span style="font-size:0.7rem;color:var(--text-muted)">Reverse image:</span>
+    <span style="font-size:0.7rem;color:var(--text-muted)">Reverse image search avatar:</span>
     <a href="https://www.google.com/searchbyimage?image_url=${encodeURIComponent(d.avatar_url)}" target="_blank" rel="noreferrer noopener">Google</a>
     <a href="https://tineye.com/search?url=${encodeURIComponent(d.avatar_url)}" target="_blank" rel="noreferrer noopener">TinEye</a>
+    <a href="https://yandex.com/images/search?url=${encodeURIComponent(d.avatar_url)}&rpt=imageview" target="_blank" rel="noreferrer noopener">Yandex</a>
+    <a href="https://facecheck.id/#${encodeURIComponent(d.avatar_url)}" target="_blank" rel="noreferrer noopener">FaceCheck.ID</a>
+    <a href="https://pimeyes.com/en" target="_blank" rel="noreferrer noopener">PimEyes ↗</a>
   </div>` : '';
+
+  let connectedHtml = '';
+  if (d.connected_accounts?.length) {
+    connectedHtml = `<div class="discord-connected">
+      <div class="discord-connected-label">&#x1F517; Connected Accounts (publicly linked by user):</div>
+      <div class="platform-list">
+        ${d.connected_accounts.map((a) => `
+          <span class="platform-hit">
+            <span class="ph-name">${esc(a.service)}</span>
+            <span class="ph-user">${esc(a.username)}</span>
+          </span>`).join('')}
+      </div>
+      <div style="font-size:0.74rem;color:var(--text-muted);margin-top:0.4rem">These usernames have been automatically added to the investigation above.</div>
+    </div>`;
+  }
 
   return `<div class="platform-data-card">
     <div class="pdc-header">
       ${avatarHtml}
       <div style="flex:1;min-width:0">
-        <div class="pdc-name">Discord</div>
-        <div class="pdc-user">ID: ${esc(d.id || r.value)}</div>
+        <div class="pdc-name">Discord User</div>
+        <div class="pdc-user">${d.username ? esc(d.username) : `ID: ${esc(d.id || r.value)}`}</div>
         <a href="https://discord.com/users/${esc(d.id || r.value)}" target="_blank" rel="noreferrer noopener" class="pdc-link">View Profile ↗</a>
       </div>
     </div>
     ${revImgHtml}
     ${rows.length ? `<table class="pdc-table">${rows.map(([k, v]) => `<tr><td class="pdc-key">${esc(k)}</td><td class="pdc-val">${esc(v)}</td></tr>`).join('')}</table>` : ''}
+    ${connectedHtml}
   </div>`;
 }
 

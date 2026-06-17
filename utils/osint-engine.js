@@ -616,54 +616,201 @@ async function enrichPhone(phone) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Discord enrichment — real lookup for numeric IDs
+// Discord enrichment
+// Three input types are handled:
+//   - Numeric snowflake ID  (e.g. 123456789012345678)
+//   - Invite URL/code       (discord.gg/XXXXX  or  discord.com/invite/XXXXX)
+//   - Username              (everything else — added as a username seed)
 // ─────────────────────────────────────────────────────────────
 
 async function enrichDiscord(value) {
-  const isId = /^\d{15,20}$/.test(value.trim());
+  const v = value.trim();
 
-  if (isId) {
-    const r = await safe(() => get(`https://discordlookup.mesalytic.moe/v1/user/${value.trim()}`));
-    if (r && !r.error && r.status === 200 && r.data?.id) {
-      const d = r.data;
-      const avatarUrl = d.avatar?.id
-        ? `https://cdn.discordapp.com/avatars/${d.id}/${d.avatar.id}.${d.avatar.is_animated ? 'gif' : 'png'}?size=256`
-        : null;
-      const createdAt = d.created_at || (d.id ? new Date(Number(BigInt(d.id) >> 22n) + 1420070400000).toISOString() : null);
-      return {
-        type: 'discord', value,
-        data: {
-          kind: 'user_id', id: d.id,
-          global_name: d.global_name || null,
-          username: d.username || null,
-          display_name: d.display_name || d.global_name || d.username || null,
-          created_at: createdAt,
-          avatar_url: avatarUrl,
-          badges: (d.badges || []).map(b => b.name || b).filter(Boolean),
-          manual_checks: [
-            { name: 'Discord Profile', description: 'View profile page', url: `https://discord.com/users/${value}` },
-            { name: 'discord.id',      description: 'User info lookup', url: `https://discord.id/?prefill=${value}` },
-            { name: 'Lookup.guru',     description: 'User + mutual server lookup', url: `https://discord.lookup.guru/${value}` },
-          ],
-        },
-        discovered: d.username ? [{ type: 'username', value: d.username, source: 'Discord user lookup' }] : [],
-      };
-    }
+  // ── Invite URL / code ─────────────────────────────────────
+  const inviteMatch = v.match(/(?:discord\.gg|discord\.com\/invite)\/([A-Za-z0-9-]+)/i)
+                   || (/^[A-Za-z0-9-]{4,12}$/.test(v) && !(/^\d{15,20}$/.test(v)) ? null : null);
+  const bareCode   = /^[A-Za-z0-9-]{4,12}$/.test(v) && !/^\d{15,20}$/.test(v) && !v.includes('@');
+
+  if (inviteMatch || bareCode) {
+    const code = inviteMatch ? inviteMatch[1] : v;
+    return enrichDiscordInvite(code, v);
   }
 
+  // ── Numeric snowflake ID ───────────────────────────────────
+  const isId = /^\d{15,20}$/.test(v);
+  if (isId) {
+    return enrichDiscordId(v);
+  }
+
+  // ── Username fallback — add as a username seed ─────────────
+  const enc = encodeURIComponent(v);
   return {
-    type: 'discord', value,
+    type: 'discord', value: v,
     data: {
-      kind: isId ? 'user_id' : 'username',
-      manual_checks: [
-        { name: 'Discord Profile', description: isId ? 'Profile by user ID' : 'Profile by username', url: `https://discord.com/users/${value}` },
-        { name: 'discord.id',      description: 'User info lookup tool', url: `https://discord.id/?prefill=${value}` },
-        { name: 'Lookup.guru',     description: 'Discord user/server info', url: `https://discord.lookup.guru/${value}` },
-      ],
+      kind: 'username',
+      manual_checks: discordUsernameDorks(v),
     },
-    discovered: isId ? [] : [{ type: 'username', value, source: 'Discord username' }],
+    discovered: [{ type: 'username', value: v, source: 'Discord username' }],
   };
 }
+
+// Lookup a Discord server invite and extract the inviter's user ID
+async function enrichDiscordInvite(code, originalValue) {
+  const r = await safe(() => get(
+    `https://discord.com/api/v10/invites/${encodeURIComponent(code)}?with_counts=true&with_expiration=true`,
+    { headers: { 'User-Agent': UA } }
+  ));
+
+  const discovered = [];
+  const enc = encodeURIComponent(code);
+
+  if (!r || r.error || r.status !== 200 || !r.data?.code) {
+    return {
+      type: 'discord', value: originalValue,
+      data: {
+        kind: 'server_invite', invite_code: code, error: 'Invite not found or expired',
+        manual_checks: [
+          { name: 'Try invite in browser', category: 'Discord', url: `https://discord.gg/${code}` },
+        ],
+      },
+      discovered: [],
+    };
+  }
+
+  const d     = r.data;
+  const guild = d.guild || {};
+  const inv   = d.inviter;  // undefined if server auto-generated invite
+
+  if (inv?.id) {
+    discovered.push({ type: 'discord', value: inv.id, source: `Discord invite ${code} — created by this user` });
+  }
+
+  const guildIconUrl = guild.icon
+    ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=128`
+    : null;
+  const inviterAvatarUrl = inv?.avatar
+    ? `https://cdn.discordapp.com/avatars/${inv.id}/${inv.avatar}.png?size=256`
+    : null;
+
+  return {
+    type: 'discord', value: originalValue,
+    data: {
+      kind: 'server_invite',
+      invite_code: code,
+      server_name: guild.name || null,
+      server_id: guild.id || null,
+      server_description: guild.description || null,
+      member_count: d.approximate_member_count || null,
+      online_count: d.approximate_presence_count || null,
+      channel_name: d.channel?.name || null,
+      server_icon_url: guildIconUrl,
+      inviter_id: inv?.id || null,
+      inviter_username: inv?.username || inv?.global_name || null,
+      inviter_avatar_url: inviterAvatarUrl,
+      manual_checks: [
+        { name: 'Open server invite', category: 'Discord', url: `https://discord.gg/${code}` },
+        ...(guild.id ? [{ name: 'Server info (discord.id)', category: 'Discord', url: `https://discord.id/server?id=${guild.id}` }] : []),
+        ...(inv?.id  ? [
+          { name: 'Inviter profile', category: 'Discord', url: `https://discord.com/users/${inv.id}` },
+          { name: 'Inviter — discord.id', category: 'Discord', url: `https://discord.id/?prefill=${inv.id}` },
+        ] : []),
+      ],
+    },
+    discovered,
+  };
+}
+
+// Full enrichment for a numeric Discord user ID
+async function enrichDiscordId(id) {
+  const r = await safe(() => get(`https://discordlookup.mesalytic.moe/v1/user/${id}`));
+  const enc = encodeURIComponent(id);
+
+  if (r && !r.error && r.status === 200 && r.data?.id) {
+    const d = r.data;
+
+    const avatarUrl = d.avatar?.id
+      ? `https://cdn.discordapp.com/avatars/${d.id}/${d.avatar.id}.${d.avatar.is_animated ? 'gif' : 'png'}?size=256`
+      : null;
+    const createdAt = d.created_at
+      || new Date(Number(BigInt(d.id) >> 22n) + 1420070400000).toISOString();
+    const accountAgeDays = createdAt
+      ? Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000)
+      : null;
+
+    // Connected accounts — publicly-linked services on the user's Discord profile
+    const CONNECTED_USERNAME_SERVICES = ['github','gitlab','reddit','twitch','youtube','twitter','steam','spotify','tiktok','facebook','instagram'];
+    const connectedAccounts = (d.connected_accounts || [])
+      .filter(a => a.type && a.name)
+      .map(a => ({ service: a.type, username: a.name, id: a.id || null }));
+
+    const discovered = [];
+    if (d.username) discovered.push({ type: 'username', value: d.username, source: 'Discord profile username' });
+    for (const acct of connectedAccounts) {
+      if (CONNECTED_USERNAME_SERVICES.includes(acct.service)) {
+        discovered.push({ type: 'username', value: acct.username, source: `Discord → ${acct.service} (connected account)` });
+      }
+    }
+
+    const username = d.username || d.global_name || null;
+    return {
+      type: 'discord', value: id,
+      data: {
+        kind: 'user_id', id: d.id,
+        global_name: d.global_name || null,
+        username,
+        display_name: d.display_name || d.global_name || d.username || null,
+        created_at: createdAt,
+        account_age_days: accountAgeDays,
+        avatar_url: avatarUrl,
+        badges: (d.badges || []).map(b => b.description || b.name || b).filter(Boolean),
+        connected_accounts: connectedAccounts,
+        manual_checks: [
+          { name: 'Discord profile',      category: 'Discord', url: `https://discord.com/users/${id}` },
+          { name: 'discord.id lookup',    category: 'Discord', url: `https://discord.id/?prefill=${id}` },
+          { name: 'Lookup.guru',          category: 'Discord', url: `https://discord.lookup.guru/${id}` },
+          ...(username ? discordUsernameDorks(username) : []),
+        ],
+      },
+      discovered,
+    };
+  }
+
+  // ID lookup failed — still give useful links and derive creation date from snowflake
+  let createdAt = null;
+  try { createdAt = new Date(Number(BigInt(id) >> 22n) + 1420070400000).toISOString(); } catch {}
+
+  return {
+    type: 'discord', value: id,
+    data: {
+      kind: 'user_id', id,
+      created_at: createdAt,
+      manual_checks: [
+        { name: 'Discord profile',   category: 'Discord', url: `https://discord.com/users/${id}` },
+        { name: 'discord.id lookup', category: 'Discord', url: `https://discord.id/?prefill=${id}` },
+        { name: 'Lookup.guru',       category: 'Discord', url: `https://discord.lookup.guru/${id}` },
+      ],
+    },
+    discovered: [],
+  };
+}
+
+// Google/Bing dorks for finding someone by their Discord username
+function discordUsernameDorks(username) {
+  const q  = encodeURIComponent(`"${username}"`);
+  const qr = encodeURIComponent(username);
+  return [
+    { name: 'Google — exact match',         category: 'Web Search', url: `https://www.google.com/search?q=${q}` },
+    { name: 'Google — + discord',           category: 'Web Search', url: `https://www.google.com/search?q=${q}+discord` },
+    { name: 'Google — + real name / IRL',   category: 'Web Search', url: `https://www.google.com/search?q=${q}+%28%22real+name%22+OR+%22irl%22+OR+%22i%27m%22%29` },
+    { name: 'Google — social media',        category: 'Web Search', url: `https://www.google.com/search?q=${q}+%28instagram+OR+tiktok+OR+snapchat+OR+twitter%29` },
+    { name: 'Google — gaming platforms',    category: 'Web Search', url: `https://www.google.com/search?q=${q}+%28roblox+OR+minecraft+OR+fortnite+OR+steam%29` },
+    { name: 'Google — forums / pastebins',  category: 'Web Search', url: `https://www.google.com/search?q=${q}+%28site%3Areddit.com+OR+site%3Apastebin.com+OR+forum%29` },
+    { name: 'Bing — exact match',           category: 'Web Search', url: `https://www.bing.com/search?q=${q}` },
+    { name: 'Disboard — server search',     category: 'Discord Dirs', url: `https://disboard.org/servers/search?keyword=${qr}` },
+    { name: 'Discord.me — server search',   category: 'Discord Dirs', url: `https://discord.me/servers?query=${qr}` },
+  ];
+}
+
 
 // ─────────────────────────────────────────────────────────────
 // Master investigate function
